@@ -1,0 +1,100 @@
+/*
+  间距约定：条目自身**不带外边距**，左右页面留白与行间距统一由使用方的行容器提供
+  （列表用 .card-row + .row-collapse，首页用 .card-row）。
+  理由同 ledger-card：自带右外边距会让左滑删除块与卡片之间露出缝隙。
+*/
+.note {
+  display: flex;
+  align-items: flex-start;
+  padding: 28rpx var(--space-card, 32rpx);
+  background: var(--card-bg);
+  border-radius: var(--radius-card, 24rpx);
+  box-shadow: var(--shadow-card);
+  transition: transform 0.16s ease, opacity 0.16s ease;
+}
+
+.note--hover {
+  transform: scale(0.985);
+  opacity: 0.92;
+}
+
+/*
+  勾选圈：border-box 让 44rpx 就是最终直径（content-box 时外圈靠 3rpx 边框补色，
+  选中态会看成"底色没铺满"）；勾用 van-icon 画，不依赖字体里的 ✓ 字形。
+*/
+.note__check {
+  box-sizing: border-box;
+  width: 44rpx;
+  height: 44rpx;
+  margin-top: 4rpx;
+  margin-right: 24rpx;
+  border: 3rpx solid var(--border-color);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.18s ease, border-color 0.18s ease;
+}
+
+.note__check.is-done {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
+.note__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.note__content {
+  font-size: var(--font-body, 28rpx);
+  line-height: 1.5;
+  color: var(--text-color);
+  word-break: break-all;
+}
+
+.note__content.is-done {
+  color: var(--sub-text-color);
+  text-decoration: line-through;
+}
+
+.note__meta {
+  display: flex;
+  align-items: center;
+  margin-top: 12rpx;
+}
+
+.note__time {
+  font-size: var(--font-hint, 22rpx);
+  color: var(--sub-text-color);
+}
+
+.note__kind {
+  margin-left: 16rpx;
+  padding: 2rpx 16rpx;
+  border-radius: var(--radius-pill, 999rpx);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: var(--font-hint, 22rpx);
+}
+
+/* 截止时间小标签：逾期红、今天到期暖色、未来中性灰；沿用 kind 标签的胶囊形 */
+.note__due {
+  margin-left: 16rpx;
+  padding: 2rpx 16rpx;
+  border-radius: var(--radius-pill, 999rpx);
+  font-size: var(--font-hint, 22rpx);
+  background: var(--sub-bg, rgba(0, 0, 0, 0.04));
+  color: var(--sub-text-color);
+}
+
+.note__due--today {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.note__due--overdue {
+  background: var(--danger-soft);
+  color: var(--danger);
+}

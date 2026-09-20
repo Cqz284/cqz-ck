@@ -1,0 +1,91 @@
+/* .page 骨架、.act-btn、.row-divider、.tips、.cell-danger 已在 app.wxss 中统一定义 */
+
+.page {
+  padding: var(--space-page) 0 var(--space-section);
+}
+
+.group {
+  margin-top: var(--space-gap);
+}
+
+/* ===== 顶部概览卡 ===== */
+.hero {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  margin: 0 var(--space-page);
+  padding: var(--space-card);
+  background: var(--card-bg);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+}
+
+.hero__logo {
+  width: 96rpx;
+  height: 96rpx;
+  border-radius: 28rpx;
+  margin-right: 24rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-size: 40rpx;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.hero__main {
+  flex: 1;
+  min-width: 0;
+}
+
+.hero__name {
+  display: block;
+  font-size: var(--font-title);
+  font-weight: 500;
+  color: var(--text-color);
+}
+
+.hero__sub {
+  display: block;
+  margin-top: 8rpx;
+  font-size: var(--font-hint);
+  color: var(--sub-text-color);
+}
+
+/* 三个数字：等宽平分，用发丝线分隔 */
+.hero__stats {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  margin-top: 28rpx;
+  padding-top: 24rpx;
+  border-top: 1rpx solid var(--border-color);
+}
+
+.hero__stat {
+  flex: 1;
+  text-align: center;
+}
+
+.hero__num {
+  display: block;
+  font-size: 36rpx;
+  font-weight: 500;
+  color: var(--text-color);
+  font-variant-numeric: tabular-nums;
+}
+
+.hero__k {
+  display: block;
+  margin-top: 6rpx;
+  font-size: var(--font-hint);
+  color: var(--sub-text-color);
+}
+
+.hero__divider {
+  width: 1rpx;
+  height: 48rpx;
+  background: var(--border-color);
+}

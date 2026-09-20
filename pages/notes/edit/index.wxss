@@ -1,0 +1,100 @@
+/* .page 骨架、.segment 分段控件、.act-btn、.edit-bar 已在 app.wxss 中统一定义 */
+
+.page {
+  /* 与记账编辑页统一使用 var(--space-page)（旧实现是 24rpx，两页差 8rpx） */
+  padding: var(--space-page) 0 240rpx;
+}
+
+/* 选中态配色统一在 app.wxss（页面级选择器命中不了组件内部节点） */
+
+/* 段控项带图标：图标与文字同一行居中，颜色继承选中态（主色 / 次要色） */
+.segment__item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.segment__icon {
+  margin-right: 8rpx;
+}
+
+/* 「纸面」感：输入区给一个够写的最小高度，行距放宽一点
+   （Vant 组件开了 addGlobalClass，故页面选择器可直接命中其内部节点） */
+.van-field__control {
+  min-height: 360rpx;
+  line-height: 1.7;
+}
+
+.van-field__word-limit {
+  color: var(--sub-text-color) !important;
+}
+
+/* ===== 截止时间卡（仅待办） =====
+   卡片自带左右留白（inset 卡的口径由本卡自己保持与 cell-card 一致的对齐），
+   与输入区之间靠入场层的叠放顺序，不留额外外边距 */
+.due-card {
+  margin: 24rpx 32rpx 0;
+  padding: 28rpx 32rpx;
+  background: var(--card-bg);
+  border-radius: var(--radius-card, 24rpx);
+  box-shadow: var(--shadow-card);
+}
+
+.due-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.due-card__label {
+  font-size: var(--font-hint, 22rpx);
+  color: var(--sub-text-color);
+}
+
+.due-card__clear {
+  font-size: var(--font-hint, 22rpx);
+  color: var(--danger);
+  padding: 4rpx 8rpx;
+}
+
+.due-card__clear--hover {
+  opacity: 0.7;
+}
+
+.due-card__value {
+  margin-top: 8rpx;
+  font-size: var(--font-body, 28rpx);
+  color: var(--text-color);
+  font-variant-numeric: tabular-nums;
+}
+
+.due-card__value.is-empty {
+  color: var(--sub-text-color);
+}
+
+.due-card__actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16rpx;
+  margin-top: 24rpx;
+}
+
+/* picker 是原生组件，宽度会撑满剩余空间，收紧为内容宽 */
+.due-card__picker {
+  width: fit-content;
+}
+
+.due-chip {
+  padding: 10rpx 24rpx;
+  border-radius: var(--radius-pill, 999rpx);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: var(--font-hint, 24rpx);
+  transition: transform 0.16s ease, opacity 0.16s ease;
+}
+
+.due-chip--hover {
+  transform: scale(0.96);
+  opacity: 0.85;
+}

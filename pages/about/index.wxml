@@ -1,0 +1,30 @@
+<page-meta page-style="{{pageStyle}}"></page-meta>
+<navigation-bar title="关于" back="{{true}}" color="{{navBarColor}}" background="{{navBarBg}}"></navigation-bar>
+
+<view class="page" style="{{pageStyle}}">
+  <view class="brand enter">
+    <view class="brand__logo">账</view>
+    <text class="brand__name">{{ appName }}</text>
+    <text class="brand__ver">{{ versionText }}</text>
+  </view>
+
+  <van-cell-group inset="{{true}}" title="应用信息" class="group enter" style="animation-delay: 70ms" custom-class="cell-card">
+    <van-cell title="版本" value="{{ versionText }}" border="{{false}}" />
+    <view class="row-divider"></view>
+    <van-cell title="记账记录" value="{{ ledgerCount }} 条" border="{{false}}" />
+    <view class="row-divider"></view>
+    <van-cell title="记事项" value="{{ noteCount }} 条" border="{{false}}" />
+    <view class="row-divider"></view>
+    <van-cell title="占用空间" value="{{ usageText }}" border="{{false}}" />
+  </van-cell-group>
+
+  <van-cell-group inset="{{true}}" title="数据说明" class="group enter" style="animation-delay: 140ms" custom-class="cell-card">
+    <van-cell title="存储位置" value="本机小程序存储" border="{{false}}" />
+    <view class="row-divider"></view>
+    <van-cell title="云同步" value="暂不支持" border="{{false}}" />
+  </van-cell-group>
+
+  <view class="tips enter" style="animation-delay: 200ms">
+    所有数据只保存在这台设备的小程序存储里，不会上传到任何服务器。卸载小程序、清理小程序缓存或更换设备都会导致数据丢失，建议定期在「我的 → 导出数据」里备份到剪贴板。
+  </view>
+</view>

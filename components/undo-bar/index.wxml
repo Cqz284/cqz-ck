@@ -1,0 +1,5 @@
+<!-- 撤销条：删除后短暂停留，给用户一次后悔的机会 -->
+<view class="undo {{ show ? 'undo--in' : '' }}" catchtap="noop">
+  <text class="undo__text">{{ text }}</text>
+  <view class="undo__btn" hover-class="undo__btn--hover" hover-stay-time="60" bindtap="onUndo">撤销</view>
+</view>

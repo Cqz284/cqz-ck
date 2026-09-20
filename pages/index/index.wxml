@@ -1,0 +1,146 @@
+<page-meta page-style="{{pageStyle}}"></page-meta>
+<!-- page-style 落在 page 根元素上：这样 .fab / .pick-bar 这类与 .page 平级的 fixed 元素也能吃到主题变量 -->
+<navigation-bar title="首页" back="{{false}}" color="{{navBarColor}}" background="{{navBarBg}}"></navigation-bar>
+<scroll-view class="page" scroll-y style="{{pageStyle}}">
+  <view class="summary enter">
+    <text class="summary__label">本月结余</text>
+    <text class="summary__balance amount {{ balanceClass }}">{{ balanceText }}</text>
+    <view class="summary__row">
+      <view class="summary__col">
+        <text class="summary__k">收入</text>
+        <text class="summary__v amount--income">{{ incomeText }}</text>
+      </view>
+      <view class="summary__col">
+        <text class="summary__k">支出</text>
+        <text class="summary__v amount--expense">{{ expenseText }}</text>
+      </view>
+    </view>
+
+    <!--
+      额度进度：取代原先的「本月支出构成」占比条（分类详情从记账页的汇总卡进统计页）。
+      月预算与每日额度互相独立，各自设置了才出现；都没设置就给一个去设置的入口。
+    -->
+    <view class="summary__budget">
+      <block wx:if="{{ hasBudget }}">
+        <view wx:if="{{ dayBar.enabled }}" class="summary__bar">
+          <progress-bar
+            label="{{ dayBar.label }}"
+            value="{{ dayBar.value }}"
+            percent="{{ dayBar.percent }}"
+            level="{{ dayBar.level }}"
+            hint="{{ dayBar.hint }}"
+          />
+        </view>
+        <view wx:if="{{ monthBar.enabled }}" class="summary__bar">
+          <progress-bar
+            label="{{ monthBar.label }}"
+            value="{{ monthBar.value }}"
+            percent="{{ monthBar.percent }}"
+            level="{{ monthBar.level }}"
+            hint="{{ monthBar.hint }}"
+          />
+        </view>
+      </block>
+      <view
+        wx:else
+        class="budget-entry"
+        hover-class="budget-entry--hover"
+        hover-stay-time="60"
+        bindtap="goSettings"
+      >
+        <text class="budget-entry__text">还没设置支出额度</text>
+        <text class="budget-entry__more">去设置 ›</text>
+      </view>
+    </view>
+
+    <view class="summary__foot">
+      <text>本月 {{ monthCount }} 笔</text>
+      <text>待办 {{ pendingCount }} 条</text>
+    </view>
+  </view>
+
+  <view class="quick-grid enter" style="animation-delay: 60ms">
+    <van-grid column-num="2" border="{{false}}" gutter="{{20}}">
+      <van-grid-item icon="balance-o" text="去记账" bind:click="goAddLedger" />
+      <van-grid-item icon="notes-o" text="去记事" bind:click="goAddNote" />
+    </van-grid>
+  </view>
+
+  <view class="section">
+    <view class="section__head enter" style="animation-delay: 120ms">
+      <text class="section__title">最近记账</text>
+      <view class="section__more" hover-class="section__more--hover" bindtap="goLedgerList">查看全部 ›</view>
+    </view>
+    <view
+      wx:for="{{ recent }}"
+      wx:key="id"
+      class="card-row enter"
+      style="animation-delay: {{ 150 + index * 40 }}ms"
+    >
+      <ledger-card record="{{ item }}" currency="{{ currency }}" bind:edit="onEditRecord" />
+    </view>
+    <empty-state
+      wx:if="{{ !hasLedger }}"
+      icon="balance-o"
+      text="还没有记账，记下第一笔吧"
+      action-text="记一笔"
+      bind:action="goAddLedger"
+    />
+  </view>
+
+  <view class="section">
+    <view class="section__head enter" style="animation-delay: 200ms">
+      <text class="section__title">最近待办</text>
+      <view class="section__more" hover-class="section__more--hover" bindtap="goNotesList">查看全部 ›</view>
+    </view>
+    <!-- 到期待办横幅：仅在有逾期 / 今天到期的待办时出现，点击去记事页处理 -->
+    <view
+      wx:if="{{ todoBanner.enabled }}"
+      class="card-row enter"
+      style="animation-delay: 210ms"
+    >
+      <view class="todo-banner" hover-class="todo-banner--hover" bindtap="goNotesList">
+        <van-icon name="clock" size="26rpx" />
+        <text class="todo-banner__text">{{ todoBanner.text }}</text>
+        <text class="todo-banner__more">去处理 ›</text>
+      </view>
+    </view>
+    <!-- 待办完成度：只在有待办时出现，避免空条占位 -->
+    <view wx:if="{{ todoBar.enabled }}" class="card-row enter" style="animation-delay: 220ms">
+      <view class="progress-card">
+        <progress-bar
+          label="{{ todoBar.label }}"
+          value="{{ todoBar.value }}"
+          percent="{{ todoBar.percent }}"
+          level="{{ todoBar.level }}"
+          hint="{{ todoBar.hint }}"
+        />
+      </view>
+    </view>
+    <!--
+      待办行分成两层是刻意的：
+      外层 .row-collapse 负责"完成时整行收起"（transition + 内联 max-height 起点），
+      内层 .enter 负责入场（animation）。若放在同一节点，animation 的 fill-mode
+      会永久压住 transform，收起时的位移就失效了。
+    -->
+    <view
+      wx:for="{{ recentTodos }}"
+      wx:key="id"
+      wx:for-item="item"
+      id="todo-{{ item.id }}"
+      class="card-row row-collapse {{ removingId === item.id ? 'row-collapse--out' : '' }}"
+      style="{{ pinnedId === item.id ? 'max-height:' + pinnedHeight + 'px;' : '' }}"
+    >
+      <view class="enter" style="animation-delay: {{ 260 + index * 40 }}ms">
+        <note-item item="{{ item }}" bind:toggle="onToggleNote" bind:edit="onEditNote" />
+      </view>
+    </view>
+    <empty-state
+      wx:if="{{ !hasTodos }}"
+      icon="todo-list-o"
+      text="{{ todoEmptyText }}"
+      action-text="加待办"
+      bind:action="goAddTodo"
+    />
+  </view>
+</scroll-view>

@@ -1,0 +1,88 @@
+<page-meta page-style="{{pageStyle}}" disable-scroll="{{ scrollLocked }}"></page-meta>
+
+<navigation-bar title="{{ isEdit ? '编辑记录' : '记一笔' }}" back="{{true}}" color="{{navBarColor}}" background="{{navBarBg}}"></navigation-bar>
+
+<view class="page" style="{{pageStyle}}">
+  <view class="segment">
+    <view class="segment__pill {{ type === 'expense' ? 'is-expense' : 'is-income' }}"></view>
+    <view class="segment__item {{ type === 'expense' ? 'is-on-expense' : '' }}" hover-class="segment__item--hover" data-type="expense" bindtap="setType">支出</view>
+    <view class="segment__item {{ type === 'income' ? 'is-on-income' : '' }}" hover-class="segment__item--hover" data-type="income" bindtap="setType">收入</view>
+  </view>
+
+  <view class="amount-box">
+    <text class="amount-box__label">金额</text>
+    <view class="amount-box__row">
+      <text class="amount-box__symbol {{ type === 'income' ? 'amount--income' : 'amount--expense' }}">{{ currency }}</text>
+      <input
+        class="amount-box__input"
+        type="digit"
+        placeholder="0.00"
+        placeholder-class="amount-box__ph"
+        value="{{ amount }}"
+        bindinput="onAmount"
+      />
+    </view>
+  </view>
+
+  <view
+    class="tag-strip {{ stripReady ? '' : 'tag-strip--pending' }} {{ plainMode ? 'tag-strip--plain' : '' }} {{ managing ? 'tag-strip--managing' : '' }}"
+    bind:touchstart="onStripTouchStart"
+    bind:touchmove="onStripTouchMove"
+    bind:touchend="onStripTouchEnd"
+    bind:touchcancel="onStripTouchEnd"
+    bind:tap="onStripTap"
+  >
+    <view class="tag-strip__track" style="{{ trackStyle }}">
+      <view
+        wx:for="{{ stripItems }}"
+        wx:key="key"
+        class="strip-item {{ item.plus ? 'strip-item--plus' : '' }} {{ item.on ? 'strip-item--on' : '' }} {{ item.focus ? 'strip-item--focus' : '' }} {{ managing ? 'strip-item--jiggle' : '' }}"
+        data-i="{{ item.i }}"
+        data-plus="{{ item.plus }}"
+        catch:tap="onStripItemTap"
+      >
+        <text class="strip-item__text">{{ item.plus ? '+' : item.label }}</text>
+        <view wx:if="{{ managing && !item.plus }}" class="strip-item__del">×</view>
+      </view>
+    </view>
+    <block wx:if="{{ !plainMode }}">
+      <view class="tag-strip__fade tag-strip__fade--l"></view>
+      <view class="tag-strip__fade tag-strip__fade--r"></view>
+      <view class="tag-strip__add" hover-class="tag-strip__add--hover" hover-stay-time="60" catch:tap="onStripItemTap" data-plus="true">
+        <text class="strip-item__text">+</text>
+      </view>
+    </block>
+  </view>
+
+  <view wx:if="{{ managing }}" class="tag-manage">
+    <text class="tag-manage__hint">{{ tagsEmpty ? '还没有标签，点 + 添加或恢复默认' : '长按已进入管理，点 × 删除标签' }}</text>
+    <view class="tag-manage__acts">
+      <view class="tag-manage__btn" hover-class="tag-manage__btn--hover" bind:tap="onResetTags">恢复默认</view>
+      <view class="tag-manage__btn tag-manage__btn--primary" hover-class="tag-manage__btn--hover" bind:tap="onExitManage">完成</view>
+    </view>
+  </view>
+
+  <van-cell-group inset="{{true}}" custom-class="cell-card">
+    <picker mode="date" value="{{ date }}" bindchange="onDate">
+      <van-cell title="日期" value="{{ date }}" is-link="{{true}}" border="{{false}}" />
+    </picker>
+    <view class="row-divider"></view>
+    <picker mode="time" value="{{ time }}" bindchange="onTime">
+      <van-cell title="时间" value="{{ time }}" is-link="{{true}}" border="{{false}}" />
+    </picker>
+    <view class="row-divider"></view>
+    <van-field value="{{ remark }}" label="备注" type="textarea" placeholder="选填" autosize="{{true}}" maxlength="200" border="{{false}}" bind:change="onRemark" />
+  </van-cell-group>
+</view>
+
+<!-- 吸底操作条：只放保存（与记事编辑页一致）。独占整行即水平居中，大小不变；
+     删除统一走列表左滑 / 多选批量删除，编辑页不再提供删除入口。 -->
+<view class="edit-bar">
+  <van-button
+    type="primary"
+    round="{{true}}"
+    custom-class="act-btn"
+    custom-style="flex: 1; margin: 0;"
+    bind:click="onSubmit"
+  >保存</van-button>
+</view>

@@ -1,0 +1,10 @@
+/* .page 骨架、.row-divider、.enter、.tips 已在 app.wxss / 页面共用样式中定义 */
+
+.page {
+  padding: var(--space-page) 0 60rpx;
+}
+
+/* 开关行：让"值"与开关不打架——值文案留在左侧 */
+.cell-switch .van-cell__value {
+  color: var(--sub-text-color);
+}

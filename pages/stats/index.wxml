@@ -1,0 +1,148 @@
+<page-meta page-style="{{pageStyle}}"></page-meta>
+<navigation-bar title="分类统计" back="{{true}}" color="{{navBarColor}}" background="{{navBarBg}}"></navigation-bar>
+
+<view class="page" style="{{pageStyle}}">
+  <!--
+    时间范围：‹ › 逐格翻，中间那行点一下弹「年月日」选择器快速跳转。
+    选到某天就按那一天统计（环形图/图例整套逻辑复用，只换了过滤条件）。
+  -->
+  <view class="month">
+    <view class="month__nav" hover-class="month__nav--hover" hover-stay-time="60" bindtap="onPrevRange">‹</view>
+    <picker
+      mode="date"
+      fields="day"
+      value="{{ pickValue }}"
+      start="{{ minDate }}"
+      end="{{ todayStr }}"
+      bindchange="onPickDate"
+    >
+      <view class="month__date" hover-class="month__date--hover" hover-stay-time="60">
+        <text class="month__label">{{ rangeLabel }}</text>
+        <view class="month__caret"><van-icon name="arrow-down" size="20rpx" /></view>
+      </view>
+    </picker>
+    <view class="month__nav {{ canNext ? '' : 'month__nav--off' }}" hover-class="month__nav--hover" hover-stay-time="60" bindtap="onNextRange">›</view>
+  </view>
+
+  <!-- 单日模式下的辅助行：当日徽标 + 一键切回整月 -->
+  <view class="range" wx:if="{{ isDay }}">
+    <text class="range__badge">{{ rangeSub }}</text>
+    <view class="range__back" hover-class="range__back--hover" hover-stay-time="60" bindtap="onBackToMonth">看整月</view>
+  </view>
+
+  <!-- 收支切换（复用全局 .segment：滑块平移由 is-income 驱动） -->
+  <view class="segment">
+    <view class="segment__pill {{ isIncome ? 'is-income' : '' }}"></view>
+    <view class="segment__item {{ isIncome ? '' : 'is-on-expense' }}" hover-class="segment__item--hover" data-type="expense" bindtap="setType">支出</view>
+    <view class="segment__item {{ isIncome ? 'is-on-income' : '' }}" hover-class="segment__item--hover" data-type="income" bindtap="setType">收入</view>
+  </view>
+
+  <view class="chart-card" wx:if="{{ hasData }}">
+    <view class="chart">
+      <canvas type="2d" id="pie" class="chart__canvas" bindtap="onSliceTap"></canvas>
+      <!-- 中心文案用 HTML 叠加：颜色随主题令牌走，不必在 canvas 里另存一套配色 -->
+      <view class="chart__center">
+        <text class="chart__center-label">{{ centerLabel }}</text>
+        <text class="chart__center-value amount">{{ centerValue }}</text>
+        <text class="chart__center-hint">{{ centerHint }}</text>
+      </view>
+    </view>
+
+    <!-- 图例：点一行高亮对应扇区 -->
+    <view class="legend">
+      <view
+        wx:for="{{ rows }}"
+        wx:key="label"
+        class="legend__row {{ activeIndex === index ? 'legend__row--on' : '' }}"
+        hover-class="legend__row--hover"
+        hover-stay-time="60"
+        data-i="{{ index }}"
+        bindtap="onLegendTap"
+      >
+        <view class="legend__dot" style="background: {{ item.color }}"></view>
+        <text class="legend__label">{{ item.label }}</text>
+        <text class="legend__ratio">{{ item.ratioText }}</text>
+        <text class="legend__value">{{ item.valueText }}</text>
+      </view>
+    </view>
+  </view>
+
+  <!--
+    每日趋势（仅整月模式）：顶部一行上月对比摘要，紧接折线走势。
+    两次点击模型：第一次点某天 = 选中（高亮 + 气泡预览日期与金额），再点同一天 = 跳当日统计。
+  -->
+  <view class="trend-card" wx:if="{{ showTrend }}">
+    <view class="trend__head">
+      <text class="trend__title">每日{{ isIncome ? '收入' : '支出' }}走势</text>
+      <text class="trend__compare trend__compare--{{ compareKind }}" wx:if="{{ compareText }}">{{ compareText }}</text>
+    </view>
+    <view class="trend">
+      <!-- catchtouchmove：拖动选日期时拦下页面滚动，否则虚线会跟着页面一起抖 -->
+      <canvas
+        type="2d"
+        id="trend"
+        class="trend__canvas"
+        bindtap="onTrendTap"
+        bindtouchstart="onTrendTouchStart"
+        catchtouchmove="onTrendTouchMove"
+      ></canvas>
+      <!-- 选中气泡：锚定在选中点上方（贴顶的点改为下方）；趋势卡唯一的跳转入口 -->
+      <view
+        wx:if="{{ trendSel.enabled }}"
+        class="trend__bubble {{ trendSel.above ? '' : 'trend__bubble--below' }}"
+        style="left: {{ trendSel.x }}px; top: {{ trendSel.y }}px;"
+        bindtap="onTrendBubbleTap"
+      >
+        <text class="trend__bubble-text">{{ trendSel.text }}</text>
+        <text class="trend__bubble-cta">点按查看当日明细 ›</text>
+      </view>
+    </view>
+    <!-- X 轴刻度：与折线横向等距对齐，把"点"和"具体某天"对上号 -->
+    <view class="trend__ticks">
+      <text wx:for="{{ trendTicks }}" wx:key="*this" class="trend__tick">{{ item }}</text>
+    </view>
+    <view class="trend__hint">点或按住拖动选择日期，点气泡查看当日明细</view>
+  </view>
+
+  <!--
+    点分类看明细：整块淡入 + 分组错峰。
+    记录复用 ledger-card（只读），与记账列表同一张卡片、同一套样式；
+    按日期分组，每组带「今天/昨天/9月17日」分组头与当日小计。
+  -->
+  <view class="detail" wx:if="{{ showDetail }}">
+    <view class="detail__head">
+      <text class="detail__title">{{ detailLabel }}</text>
+      <text class="detail__count">{{ detailCount }} 笔</text>
+    </view>
+    <view
+      wx:for="{{ detailGroups }}"
+      wx:key="date"
+      wx:for-item="group"
+      class="detail__group"
+      style="animation-delay: {{ group.delay }}ms"
+    >
+      <view class="detail__group-head">
+        <text class="detail__group-label">{{ group.label }}</text>
+        <text class="detail__group-sum">{{ group.sumText }}</text>
+      </view>
+      <view class="detail__row">
+        <ledger-card
+          wx:for="{{ group.items }}"
+          wx:key="id"
+          wx:for-item="item"
+          record="{{ item }}"
+          currency="{{ currency }}"
+          readonly="{{ true }}"
+        />
+      </view>
+    </view>
+  </view>
+
+  <empty-state
+    wx:elif="{{ !hasData }}"
+    icon="bar-chart-o"
+    text="{{ emptyText }}"
+    action-text="去记一笔"
+    bind:action="goAdd"
+  />
+</view>

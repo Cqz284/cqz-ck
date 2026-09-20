@@ -1,0 +1,35 @@
+/* .page 骨架、.summary 卡片、.swipe-del、.fab、.enter / .row-collapse 已在 app.wxss 中统一定义，此处只保留本页差异 */
+
+.page {
+  /* 底部多留 120rpx：给多选操作条 / 撤销条留出空间，避免遮住最后一条记录 */
+  padding: var(--space-page) 0 340rpx;
+}
+
+.summary {
+  margin: 0 var(--space-page) var(--space-section);
+}
+
+.group { margin-bottom: var(--space-gap); }
+
+.group__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--space-page) 16rpx;
+}
+
+.group__label {
+  font-size: var(--font-sub);
+  color: var(--text-color);
+}
+
+.group__sum {
+  font-size: var(--font-hint);
+  color: var(--sub-text-color);
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+  操作块的宽度 / 高度 / 圆角统一在 app.wxss 的 .swipe-act 里定义（= left-width / right-width 144），
+  本页不再覆盖，避免两处数字不一致时又出现缝隙或高度差。
+*/

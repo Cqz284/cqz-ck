@@ -1,0 +1,14 @@
+{
+  "usingComponents": {
+    "navigation-bar": "/components/navigation-bar/navigation-bar",
+    "note-item": "/components/business/note-item/index",
+    "progress-bar": "/components/business/progress-bar/index",
+    "empty-state": "/components/empty-state/index",
+    "undo-bar": "/components/undo-bar/index",
+    "van-search": "@vant/weapp/search/index",
+    "van-tabs": "@vant/weapp/tabs/index",
+    "van-tab": "@vant/weapp/tab/index",
+    "van-icon": "@vant/weapp/icon/index",
+    "van-swipe-cell": "@vant/weapp/swipe-cell/index"
+  }
+}

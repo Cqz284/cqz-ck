@@ -1,0 +1,64 @@
+{
+  "pages": [
+    "pages/index/index",
+    "pages/ledger/list/index",
+    "pages/ledger/edit/index",
+    "pages/notes/list/index",
+    "pages/notes/edit/index",
+    "pages/stats/index",
+    "pages/profile/index",
+    "pages/settings/index",
+    "pages/about/index"
+  ],
+  "window": {
+    "navigationBarTextStyle": "black",
+    "navigationStyle": "custom"
+  },
+  "tabBar": {
+    "color": "@tabFontColor",
+    "selectedColor": "@tabSelectedColor",
+    "backgroundColor": "@tabBgColor",
+    "borderStyle": "@tabBorderStyle",
+    "list": [
+      {
+        "pagePath": "pages/index/index",
+        "text": "首页",
+        "iconPath": "@iconPath1",
+        "selectedIconPath": "@selectedIconPath1"
+      },
+      {
+        "pagePath": "pages/ledger/list/index",
+        "text": "记账",
+        "iconPath": "@iconPath2",
+        "selectedIconPath": "@selectedIconPath2"
+      },
+      {
+        "pagePath": "pages/notes/list/index",
+        "text": "记事",
+        "iconPath": "@iconPath3",
+        "selectedIconPath": "@selectedIconPath3"
+      },
+      {
+        "pagePath": "pages/profile/index",
+        "text": "我的",
+        "iconPath": "@iconPath4",
+        "selectedIconPath": "@selectedIconPath4"
+      }
+    ]
+  },
+  "style": "v2",
+  "componentFramework": "glass-easel",
+  "renderer": "webview",
+  "darkmode": true,
+  "themeLocation": "theme.json",
+  "sitemapLocation": "sitemap.json",
+  "lazyCodeLoading": "requiredComponents",
+  "usingComponents": {
+    "van-cell": "@vant/weapp/cell/index",
+    "van-cell-group": "@vant/weapp/cell-group/index",
+    "van-field": "@vant/weapp/field/index",
+    "van-button": "@vant/weapp/button/index",
+    "van-empty": "@vant/weapp/empty/index",
+    "van-toast": "@vant/weapp/toast/index"
+  }
+}

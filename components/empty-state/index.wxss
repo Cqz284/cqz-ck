@@ -1,0 +1,36 @@
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 96rpx var(--space-page, 32rpx);
+}
+
+.empty__icon {
+  width: 128rpx;
+  height: 128rpx;
+  border-radius: 50%;
+  background: var(--primary-soft);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 24rpx;
+}
+
+.empty__text {
+  font-size: var(--font-sub, 24rpx);
+  color: var(--sub-text-color);
+}
+
+.empty__action {
+  margin-top: 32rpx;
+  padding: 16rpx 48rpx;
+  border-radius: var(--radius-pill, 999rpx);
+  background: var(--primary);
+  color: #fff;
+  font-size: var(--font-sub, 24rpx);
+}
+
+.empty__action--hover {
+  opacity: 0.88;
+}

@@ -1,0 +1,26 @@
+{
+  "name": "ledger-notes",
+  "version": "1.0.0",
+  "private": true,
+  "description": "记事记账小程序基础版（本地存储版）",
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "check": "npm run typecheck && npm test"
+  },
+  "dependencies": {
+    "@vant/weapp": "^1.11.7",
+    "dayjs": "^1.11.23",
+    "mobx-miniprogram": "^6.12.3",
+    "mobx-miniprogram-bindings": "^7.0.0"
+  },
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "@types/node": "^22.20.3",
+    "jest": "^30.5.1",
+    "miniprogram-api-typings": "^5.2.3",
+    "ts-jest": "^29.4.12",
+    "typescript": "~5.6.3"
+  }
+}

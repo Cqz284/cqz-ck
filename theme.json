@@ -1,0 +1,30 @@
+{
+  "light": {
+    "tabFontColor": "#9a948d",
+    "tabSelectedColor": "#34be8c",
+    "tabBgColor": "#ffffff",
+    "tabBorderStyle": "black",
+    "iconPath1": "assets/tabbar/light/home.png",
+    "selectedIconPath1": "assets/tabbar/light/home-active.png",
+    "iconPath2": "assets/tabbar/light/ledger.png",
+    "selectedIconPath2": "assets/tabbar/light/ledger-active.png",
+    "iconPath3": "assets/tabbar/light/notes.png",
+    "selectedIconPath3": "assets/tabbar/light/notes-active.png",
+    "iconPath4": "assets/tabbar/light/profile.png",
+    "selectedIconPath4": "assets/tabbar/light/profile-active.png"
+  },
+  "dark": {
+    "tabFontColor": "#a39c92",
+    "tabSelectedColor": "#34be8c",
+    "tabBgColor": "#171512",
+    "tabBorderStyle": "white",
+    "iconPath1": "assets/tabbar/dark/home.png",
+    "selectedIconPath1": "assets/tabbar/dark/home-active.png",
+    "iconPath2": "assets/tabbar/dark/ledger.png",
+    "selectedIconPath2": "assets/tabbar/dark/ledger-active.png",
+    "iconPath3": "assets/tabbar/dark/notes.png",
+    "selectedIconPath3": "assets/tabbar/dark/notes-active.png",
+    "iconPath4": "assets/tabbar/dark/profile.png",
+    "selectedIconPath4": "assets/tabbar/dark/profile-active.png"
+  }
+}

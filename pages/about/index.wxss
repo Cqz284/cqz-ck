@@ -1,0 +1,44 @@
+/* .page 骨架、.row-divider、.tips、.enter 已在 app.wxss 中统一定义 */
+
+.page {
+  padding: var(--space-page) 0 60rpx;
+}
+
+.group {
+  margin-top: var(--space-gap);
+}
+
+/* ===== 品牌区：图标 + 名称 + 版本 ===== */
+.brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 24rpx 0 40rpx;
+}
+
+.brand__logo {
+  width: 128rpx;
+  height: 128rpx;
+  border-radius: 36rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-size: 56rpx;
+  font-weight: 500;
+}
+
+.brand__name {
+  margin-top: 20rpx;
+  font-size: var(--font-title);
+  font-weight: 500;
+  color: var(--text-color);
+}
+
+.brand__ver {
+  margin-top: 8rpx;
+  font-size: var(--font-hint);
+  color: var(--sub-text-color);
+  font-variant-numeric: tabular-nums;
+}

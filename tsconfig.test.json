@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "types": ["miniprogram-api-typings", "jest", "node"]
+  },
+  "include": ["**/*.ts"],
+  "exclude": ["node_modules", "miniprogram_npm"]
+}

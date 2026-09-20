@@ -1,0 +1,23 @@
+<!-- 分类占比条：一眼看到构成，点一下进完整环形图 -->
+<view wx:if="{{ items.length }}" class="mix" hover-class="mix--hover" hover-stay-time="80" bindtap="onTap">
+  <view class="mix__head">
+    <text class="mix__title">{{ title }}</text>
+    <text class="mix__total">{{ totalText }}</text>
+    <text class="mix__more">详情 ›</text>
+  </view>
+  <view class="mix__bar">
+    <view
+      wx:for="{{ items }}"
+      wx:key="label"
+      class="mix__seg"
+      style="width: {{ item.percent }}%; background: {{ item.color }};"
+    ></view>
+  </view>
+  <view class="mix__legend">
+    <view wx:for="{{ items }}" wx:key="label" class="mix__item">
+      <view class="mix__dot" style="background: {{ item.color }};"></view>
+      <text class="mix__label">{{ item.label }}</text>
+      <text class="mix__pct">{{ item.percentText }}</text>
+    </view>
+  </view>
+</view>

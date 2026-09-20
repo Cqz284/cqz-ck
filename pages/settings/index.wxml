@@ -1,0 +1,48 @@
+<page-meta page-style="{{pageStyle}}"></page-meta>
+<navigation-bar title="设置" back="{{true}}" color="{{navBarColor}}" background="{{navBarBg}}"></navigation-bar>
+
+<view class="page" style="{{pageStyle}}">
+  <!--
+    入场过渡：用 .enter--slow（0.62s / 40rpx），比列表行的默认动效更慢更大——
+    这里都是整块卡片，动得快就看不出来（"拉长"靠的是这个更慢更大的运动，不是延迟）。
+    错峰 0/40/80/120ms：延迟压在 120ms 内既有层次感，又不会被当成"还在加载"。
+    主题不做开关：始终跟随系统，故这里没有主题行。
+  -->
+  <van-cell-group inset="{{true}}" title="显示" class="enter enter--slow" custom-class="cell-card">
+    <van-cell title="货币符号" value="{{ currencyLabel }}" icon="exchange" is-link="{{true}}" border="{{false}}" bind:click="onPickCurrency" />
+  </van-cell-group>
+
+  <van-cell-group inset="{{true}}" title="预算额度" class="group enter enter--slow" style="animation-delay: 40ms" custom-class="cell-card">
+    <van-cell title="月度支出预算" value="{{ monthlyBudgetText }}" icon="balance-o" is-link="{{true}}" border="{{false}}" bind:click="onEditMonthlyBudget" />
+    <view class="row-divider"></view>
+    <van-cell title="每日支出额度" value="{{ dailyBudgetText }}" icon="records" is-link="{{true}}" border="{{false}}" bind:click="onEditDailyBudget" />
+    <view class="row-divider"></view>
+    <van-cell title="超额提醒" value="弹窗 · 每天一次" icon="warning-o" border="{{false}}" />
+  </van-cell-group>
+
+  <van-cell-group inset="{{true}}" title="交互" class="group enter enter--slow" style="animation-delay: 80ms" custom-class="cell-card">
+    <van-cell
+      title="震动反馈"
+      value="{{ haptics ? '已开启' : '已关闭' }}"
+      icon="volume-o"
+      border="{{false}}"
+      custom-class="cell-switch"
+    >
+      <van-switch
+        slot="right-icon"
+        checked="{{ haptics }}"
+        size="46rpx"
+        active-color="#34be8c"
+        bind:change="onToggleHaptics"
+      />
+    </van-cell>
+  </van-cell-group>
+
+  <van-cell-group inset="{{true}}" title="账号与同步" class="group enter enter--slow" style="animation-delay: 120ms" custom-class="cell-card">
+    <van-cell title="云备份" value="敬请期待" icon="shield-o" border="{{false}}" bind:click="onComing" />
+    <view class="row-divider"></view>
+    <van-cell title="账号登录" value="敬请期待" icon="manager-o" border="{{false}}" bind:click="onComing" />
+  </van-cell-group>
+
+  <view class="tips enter enter--slow" style="animation-delay: 500ms">费用额度按本机记录统计，超出时弹窗提醒（每天最多一次）。设置随小程序数据一起导出。</view>
+</view>

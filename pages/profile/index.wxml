@@ -1,0 +1,51 @@
+<page-meta page-style="{{pageStyle}}"></page-meta>
+<navigation-bar title="我的" back="{{false}}" color="{{navBarColor}}" background="{{navBarBg}}"></navigation-bar>
+
+<view class="page" style="{{pageStyle}}">
+  <!-- 顶部概览：应用信息 + 三个总量，替代原先把"数据概览"做成一串 cell 的写法 -->
+  <view class="hero enter enter--slow">
+    <view class="hero__logo">账</view>
+    <view class="hero__main">
+      <text class="hero__name">{{ appName }}</text>
+      <text class="hero__sub">数据保存在本机 · {{ usageText }}</text>
+    </view>
+    <view class="hero__stats">
+      <view class="hero__stat">
+        <text class="hero__num">{{ ledgerCount }}</text>
+        <text class="hero__k">记账</text>
+      </view>
+      <view class="hero__divider"></view>
+      <view class="hero__stat">
+        <text class="hero__num">{{ noteCount }}</text>
+        <text class="hero__k">记事</text>
+      </view>
+      <view class="hero__divider"></view>
+      <view class="hero__stat">
+        <text class="hero__num">{{ pendingCount }}</text>
+        <text class="hero__k">待办</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 入场节律与设置页保持一致：.enter--slow + 0/60/120/180/240ms 错峰 -->
+  <van-cell-group inset="{{true}}" title="偏好设置" class="group enter enter--slow" style="animation-delay: 60ms" custom-class="cell-card">
+    <!-- 不显示右侧摘要：这里是入口，偏好值放在二级页里即可，避免一行挤两种信息 -->
+    <van-cell title="设置" icon="setting-o" is-link="{{true}}" border="{{false}}" bind:click="goSettings" />
+  </van-cell-group>
+
+  <van-cell-group inset="{{true}}" title="数据管理" class="group enter enter--slow" style="animation-delay: 120ms" custom-class="cell-card">
+    <van-cell title="备份到文件" value="可恢复的完整备份" icon="orders-o" is-link="{{true}}" border="{{false}}" bind:click="onBackup" />
+    <view class="row-divider"></view>
+    <van-cell title="从备份恢复" value="选文件或剪贴板" icon="replay" is-link="{{true}}" border="{{false}}" bind:click="onRestore" />
+    <view class="row-divider"></view>
+    <van-cell title="导出数据" value="复制到剪贴板" icon="share-o" is-link="{{true}}" border="{{false}}" bind:click="onExport" />
+    <view class="row-divider"></view>
+    <van-cell title="清空全部数据" icon="delete-o" is-link="{{true}}" border="{{false}}" bind:click="onClear" custom-class="cell-danger" />
+  </van-cell-group>
+
+  <van-cell-group inset="{{true}}" title="关于" class="group enter enter--slow" style="animation-delay: 180ms" custom-class="cell-card">
+    <van-cell title="关于本应用" value="{{ versionText }}" icon="info-o" is-link="{{true}}" border="{{false}}" bind:click="goAbout" />
+  </van-cell-group>
+
+  <view class="tips enter enter--slow" style="animation-delay: 240ms">数据保存在本机小程序存储中，卸载小程序或更换设备会丢失。建议定期「备份到文件」并发送到文件传输助手，换机后可从备份完整恢复。</view>
+</view>

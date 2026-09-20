@@ -1,0 +1,589 @@
+page {
+  /* ===== 布局令牌（两套主题共用） ===== */
+  --space-page: 32rpx;
+  --space-card: 32rpx;
+  --space-gap: 24rpx;
+  --space-section: 48rpx;
+  --radius-card: 24rpx;
+  --radius-control: 16rpx;
+  --radius-pill: 999rpx;
+  --font-amount: 40rpx;
+  --font-title: 32rpx;
+  --font-amount-input: 56rpx;
+  --font-body: 28rpx;
+  --font-sub: 24rpx;
+  --font-hint: 22rpx;
+
+  /* ===== 颜色（浅色，首帧兜底） =====
+     说明：真实颜色由 utils/theme.ts 生成内联变量、经 <page-meta page-style> 注入到 page 根元素，
+     本节的浅色值只在"内联变量还没写上去"的首帧起兜底作用。
+     注意：**不要再加"跟随系统深色"的媒体查询**——它会在"系统深色 + 应用内浅色"时闪屏，
+     原因见文件末尾的说明。
+     配色改动请同步 utils/theme.ts、本文件、theme.json 三处。 */
+  --bg-color: #ffffff;
+  --card-bg: #ffffff;
+  --border-color: #f2efeb;
+  --text-color: #2e2a26;
+  --sub-text-color: #9a948d;
+  --primary: #34be8c;
+  --primary-soft: #e9f7f1;
+  --danger: #ee6c5c;
+  --danger-soft: #fdeeeb;
+  --accent: #ffb74d;
+  --accent-soft: #fff4e3;
+  --shadow-card: 0 4rpx 20rpx rgba(150, 125, 95, 0.08);
+
+  /* ===== Vant 变量（浅色） ===== */
+  --background-color: #ffffff;
+  --cell-background-color: #ffffff;
+  --cell-text-color: #2e2a26;
+  --cell-value-color: #9a948d;
+  --cell-label-color: #9a948d;
+  --cell-border-color: #f2efeb;
+  --cell-group-title-color: #9a948d;
+  --field-input-text-color: #2e2a26;
+  --field-placeholder-text-color: #9a948d;
+  --field-label-color: #2e2a26;
+  --search-background-color: #ffffff;
+  --tabs-nav-background-color: #ffffff;
+  --tab-text-color: #9a948d;
+  --tab-active-text-color: #34be8c;
+  --grid-item-content-background-color: #ffffff;
+  --grid-item-content-active-color: #f7f5f2;
+  --grid-item-text-color: #2e2a26;
+  --button-primary-background-color: #34be8c;
+  --button-primary-border-color: #34be8c;
+  --button-danger-background-color: #ee6c5c;
+  --button-danger-border-color: #ee6c5c;
+  --button-default-background-color: #ffffff;
+  --button-default-color: #2e2a26;
+  --button-default-border-color: #f2efeb;
+
+  background: var(--bg-color);
+  color: var(--text-color);
+}
+
+/* ===== 全局通用类 ===== */
+.card-surface {
+  background: var(--card-bg);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+}
+
+.amount {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
+  font-size: var(--font-amount);
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+.amount--income { color: var(--primary); }
+.amount--expense { color: var(--danger); }
+
+.text-sub {
+  font-size: var(--font-sub);
+  color: var(--sub-text-color);
+}
+
+.text-hint {
+  font-size: var(--font-hint);
+  color: var(--sub-text-color);
+}
+
+/* 轻点反馈（生活化的柔和回弹） */
+.tap-soft {
+  transition: transform 0.16s ease, opacity 0.16s ease;
+}
+
+.tap-soft--active {
+  transform: scale(0.985);
+  opacity: 0.9;
+}
+
+/* ===== 页面骨架 =====
+   各页面只需再声明自己的 padding（差异仅此一项），避免 6 份重复定义。 */
+.page {
+  min-height: 100vh;
+  background: var(--bg-color);
+  color: var(--text-color);
+  box-sizing: border-box;
+}
+
+/* ===== 月度汇总卡片（首页 / 记账列表共用；各页只覆盖 margin） ===== */
+.summary {
+  padding: var(--space-card);
+  background: var(--card-bg);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+}
+
+.summary__label {
+  font-size: var(--font-sub);
+  color: var(--sub-text-color);
+}
+
+.summary__balance {
+  display: block;
+  margin-top: 12rpx;
+  font-size: var(--font-amount-input);
+  font-weight: 500;
+}
+
+.summary__row {
+  display: flex;
+  margin-top: 28rpx;
+  padding-top: 24rpx;
+  border-top: 1rpx solid var(--border-color);
+}
+
+.summary__col { flex: 1; }
+
+/* 汇总卡里的分类占比区：用一条发丝线与上方收支分栏隔开 */
+.summary__mix {
+  margin-top: 24rpx;
+  padding-top: 24rpx;
+  border-top: 1rpx solid var(--border-color);
+}
+
+/* 汇总卡里的额度进度区（首页）：与占比区同一套分隔方式。
+   注意：首页已用额度进度取代占比条，占比条只留在记账页。 */
+.summary__budget {
+  margin-top: 24rpx;
+  padding-top: 24rpx;
+  border-top: 1rpx solid var(--border-color);
+}
+
+/* 两条以上额度进度之间的间距；:first-child 归零。
+   即使个别环境不支持该选择器，也只是首条多 24rpx 留白，不影响可用性。 */
+.summary__bar {
+  margin-top: 24rpx;
+}
+
+.summary__bar:first-child {
+  margin-top: 0;
+}
+
+/* 未设置额度时的入口行 */
+.budget-entry {
+  display: flex;
+  align-items: center;
+  font-size: var(--font-hint);
+  color: var(--sub-text-color);
+  transition: opacity 0.16s ease;
+}
+
+.budget-entry--hover {
+  opacity: 0.6;
+}
+
+.budget-entry__more {
+  margin-left: auto;
+  color: var(--primary);
+}
+
+.summary__k {
+  display: block;
+  font-size: var(--font-hint);
+  color: var(--sub-text-color);
+}
+
+.summary__v {
+  display: block;
+  margin-top: 8rpx;
+  font-size: var(--font-body);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ===== 分段控件（记账编辑 / 记事编辑共用；选中态配色各页自定义） ===== */
+.segment {
+  position: relative;
+  display: flex;
+  margin: 0 var(--space-page) 24rpx;
+  padding: 6rpx;
+  background: var(--border-color);
+  border-radius: var(--radius-control);
+}
+
+.segment__pill {
+  position: absolute;
+  top: 6rpx;
+  bottom: 6rpx;
+  left: 6rpx;
+  width: calc(50% - 6rpx);
+  background: var(--card-bg);
+  border-radius: 12rpx;
+  box-shadow: 0 2rpx 8rpx rgba(150, 125, 95, 0.12);
+  transition: transform 0.22s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+/* 选中第二段时滑块平移一个自身宽度（= 50% - 6rpx），正好停在右半格。
+   记账页"收入"与记事页"待办"共用；不带此类的默认停在左半格。 */
+.segment__pill.is-income,
+.segment__pill.is-todo {
+  transform: translateX(100%);
+}
+
+.segment__item {
+  position: relative;
+  flex: 1;
+  text-align: center;
+  padding: 20rpx 0;
+  font-size: var(--font-body);
+  color: var(--sub-text-color);
+  /* transform 也参与过渡：按住时的缩放回弹才顺滑 */
+  transition: color 0.2s ease, transform 0.16s cubic-bezier(0.22, 1.32, 0.36, 1);
+}
+
+/* ===== 卡片行容器：页面左右留白 + 行间距的唯一来源 =====
+   卡片组件自身不带外边距（见 ledger-card / note-item 的 wxss 注释）：
+   卡片若自带右外边距，左滑删除块与卡片之间就必然露出一条缝。 */
+.card-row {
+  margin: 0 var(--space-page) var(--space-gap);
+}
+
+/* ===== 左滑 / 右滑 操作块（两个列表页共用）
+   三块（右滑「多选」、左滑「删除」、多选态左滑「退出」）共用同一套几何：
+   - 宽度 = van-swipe-cell 的 left-width / right-width：滑开多少就露出多少，滑开距离与块宽严格相等
+     ⚠️ 单位陷阱：left-width / right-width 的单位是 **px**（Vant 内部拼进 translate3d(...px)），
+     而这里写的是 **rpx**。页面必须传 utils/rpx.ts 的 swipeActionWidth()（= rpxToPx(144)）；
+     直接写 144 会让滑开距离是块宽的 2 倍（375 屏上 144px vs 72px），块的外侧空出一条。
+   - 高度 100% = 卡片高度：卡片不带外边距后，槽位高度就等于卡片高度，不再有 16rpx 歧义
+   - 左右留白交给行容器 → 块的边缘落在卡片的栅格线上，与卡片严丝合缝
+   滑开的瞬时也不会错位：卡片与槽位在同一个被平移的容器里，块的边缘恒等于卡片边缘。 ===== */
+.swipe-act {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  /* 必须与页面 van-swipe-cell 的 left-width / right-width 保持一致 */
+  width: 144rpx;
+  height: 100%;
+  color: #fff;
+  /* 与卡片同圆角：滑开后两块像一对，而不是贴了张色卡 */
+  border-radius: var(--radius-card);
+  font-size: var(--font-hint);
+  line-height: 1.2;
+  /* 禁止长按选中/弹出系统菜单：滑开块不是文本区，长按选中会打断用户下一步操作 */
+  user-select: none;
+  -webkit-user-select: none;
+  transition: transform 0.16s ease, opacity 0.16s ease;
+}
+
+/* 左滑删除 */
+.swipe-act--danger { background: var(--danger); }
+/* 右滑进入多选 */
+.swipe-act--primary { background: var(--primary); }
+/* 多选态左滑「退出」：中性色，与删除的红色区分开。
+   浅色用半透明暖灰（不抢眼、也不像禁用）；深色下由 utils/theme.ts 注入的 --swipe-exit-bg 覆盖。 */
+.swipe-act--exit,
+.swipe-act--muted { background: var(--swipe-exit-bg, rgba(120, 112, 104, 0.55)); }
+/* 多选态左滑退出：中性灰，与"破坏性动作"在颜色上分开（与开头的 --swipe-exit-bg 同源）
+   保留 --muted 这个名字：它是这个块从多选功能上线起就在用的类名，外部改动最少。 */
+.swipe-act--muted { background: var(--swipe-exit-bg, rgba(120, 112, 104, 0.55)); }
+
+.swipe-act--active {
+  /* 幅度刻意收小：块与卡片严丝合缝，缩太多会在四周透出一圈背景 */
+  transform: scale(0.96);
+  opacity: 0.86;
+}
+
+.swipe-act__label {
+  margin-top: 6rpx;
+}
+
+/* ===== 入场动画 =====
+   首页分区与列表卡片依次上浮入场；错峰延迟由模板内联 animation-delay 控制。
+   注意 fill-mode 用 both：延迟期间保持 from 状态（透明），不会先闪一下再动。 ===== */
+@keyframes enter-up {
+  from {
+    opacity: 0;
+    transform: translateY(24rpx) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.enter {
+  animation: enter-up 0.34s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* 慢速入场：给"静态设置类页面"（设置 / 我的）用。
+   默认那份 0.34s + 24rpx 位移是给列表行设计的——行小、又要求利落，所以轻；
+   放在整块分组卡片上就太轻了，几乎看不出在动。这里把时长拉到 0.62s、位移加到 40rpx，
+   观感才是"浮上来"。错峰仍压在 240ms 以内，避免靠下的分组被当成"还在加载"。 */
+@keyframes enter-up-soft {
+  from {
+    opacity: 0;
+    transform: translateY(40rpx);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.enter--slow {
+  animation: enter-up-soft 0.62s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* ===== 退出动画：删除单条时整行收起 =====
+   起始高度由 JS 测量后写成内联 max-height（CSS 无法从 auto 过渡到 0），
+   .row-collapse--out 用 !important 覆盖它，过渡才有确定的起点与终点。
+   margin-bottom 一并收到 0，否则收完后还会残留一段行间距。 ===== */
+.row-collapse {
+  overflow: hidden;
+  transition: max-height 0.28s cubic-bezier(0.4, 0, 0.2, 1),
+    margin-bottom 0.28s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.22s ease,
+    transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.row-collapse--out {
+  max-height: 0 !important;
+  margin-bottom: 0;
+  opacity: 0;
+  transform: translateX(-56rpx) scale(0.96);
+}
+
+/* ===== 按下变淡（共用） =====
+   .nav-act 系列原本用在导航栏右上角的「选择 / 完成」；多选入口改成手势后，
+   导航栏不再有文字按钮，但 .nav-act--hover 这个"按下变淡"仍被多选操作条的「全选」复用，故保留。
+   若哪天真要恢复导航栏文字按钮：① 不要用负外边距（右邻就是胶囊）；② 与胶囊留 8rpx 间距；
+   ③ 点击热区撑到 44px 级；④ 用主色，让它一眼可辨是"动作"而非标题。 */
+.nav-act {
+  margin-right: 8rpx;
+  padding: 16rpx 8rpx 16rpx 20rpx;
+  font-size: var(--font-body);
+  line-height: 1.2;
+  color: var(--primary);
+  transition: opacity 0.16s ease;
+}
+
+.nav-act--hover {
+  opacity: 0.55;
+}
+
+/* ===== 多选：行首选择位 =====
+   平时宽度为 0（卡片仍是整行宽），进入多选后平滑展开，避免"啪"地跳一下 */
+.pick {
+  display: flex;
+  align-items: center;
+  width: 0;
+  opacity: 0;
+  overflow: hidden;
+  flex-shrink: 0;
+  transition: width 0.22s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.18s ease,
+    margin-right 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.pick--in {
+  width: 56rpx;
+  opacity: 1;
+  margin-right: 16rpx;
+}
+
+.pick__box {
+  /* border-box：44rpx 就是最终直径。用 content-box 时外围靠 3rpx 边框补色，
+     选中态容易看成"红底没铺满"，这里让它一次到位 */
+  box-sizing: border-box;
+  width: 44rpx;
+  height: 44rpx;
+  border-radius: 50%;
+  border: 3rpx solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+}
+
+.pick__box.is-on {
+  background: var(--danger);
+  border-color: var(--danger);
+  transform: scale(1.06);
+}
+
+/* 分段控件项的点按反馈：滑块在下方平移时，被按住的文字给一点回弹 */
+.segment__item--hover {
+  transform: scale(0.94);
+}
+
+/* ===== 分段控件选中态配色（记账页用收支色强调，记事页用主色） =====
+   放在这里而不是各编辑页：van-tabs 的页签是组件内部节点，页面级选择器命中不了，
+   选中色会整体失效（曾出现"页签看不出选中的是哪一个"）。 */
+.segment__item.is-on-expense { color: var(--danger); font-weight: 500; }
+.segment__item.is-on-income { color: var(--primary); font-weight: 500; }
+.segment__item.is-active { color: var(--primary); font-weight: 500; }
+
+/* ===== 多选时行内容区（滑删组件所在处）占满剩余空间 ===== */
+.row-inner {
+  display: flex;
+  align-items: center;
+}
+
+.row-main {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ===== 多选底部操作条 =====
+   列表页都是 tab 页，系统 tabBar 不在页面视图内，故 bottom: 0 即贴在 tabBar 之上。 */
+.pick-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 12;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20rpx var(--space-page);
+  padding-bottom: calc(20rpx + constant(safe-area-inset-bottom));
+  padding-bottom: calc(20rpx + env(safe-area-inset-bottom));
+  background: var(--card-bg);
+  border-top: 1rpx solid var(--border-color);
+  transform: translateY(110%);
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.pick-bar--in {
+  transform: translateY(0);
+}
+
+.pick-bar__all {
+  display: flex;
+  align-items: center;
+  padding: 8rpx 0;
+}
+
+.pick-bar__label {
+  margin-left: 12rpx;
+  font-size: var(--font-sub);
+  color: var(--sub-text-color);
+}
+
+.pick-bar__count {
+  font-size: var(--font-hint);
+  color: var(--sub-text-color);
+}
+
+.pick-bar__btn {
+  padding: 12rpx 32rpx;
+  border-radius: var(--radius-pill);
+  background: var(--danger);
+  color: #fff;
+  font-size: var(--font-sub);
+  font-weight: 500;
+  transition: transform 0.16s ease, opacity 0.16s ease;
+}
+
+.pick-bar__btn--hover {
+  transform: scale(0.94);
+  opacity: 0.9;
+}
+
+/* 未选中任何一条时按钮降到"禁用"观感（点击给出提示，不做静默失效） */
+.pick-bar__btn--off {
+  background: var(--border-color);
+  color: var(--sub-text-color);
+}
+
+/* ===== 编辑页吸底操作条（记账 / 记事共用） =====
+   条内只有「保存」一个按钮：独占整行即天然水平居中，尺寸与从前完全一致。
+   删除不再进编辑页——列表的左滑删除与多选批量删除已经覆盖，
+   同一个动作给两个入口（且一个要弹窗确认、一个带撤销）只会让语义分裂。 ===== */
+.edit-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16rpx var(--space-page);
+  padding-bottom: calc(16rpx + constant(safe-area-inset-bottom));
+  padding-bottom: calc(16rpx + env(safe-area-inset-bottom));
+  background: var(--card-bg);
+  border-top: 1rpx solid var(--border-color);
+}
+
+/* ===== 进度卡片（首页待办完成度 / 记事页待办完成度共用） =====
+   进度条本身由 components/business/progress-bar 渲染，这里只给"装它的卡片"。 */
+.progress-card {
+  padding: 24rpx var(--space-card);
+  background: var(--card-bg);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+}
+
+/* ===== 说明性小字（我的 / 设置 / 关于 等页面共用） ===== */
+.tips {
+  margin-top: 32rpx;
+  padding: 0 44rpx;
+  font-size: var(--font-sub);
+  line-height: 1.7;
+  color: var(--sub-text-color);
+}
+
+/* 危险操作文字色（Vant cell 标题） */
+.cell-danger {
+  color: var(--danger) !important;
+}
+
+/* ===== 悬浮新增按钮（两个列表页共用） ===== */
+.fab {
+  position: fixed;
+  right: 40rpx;
+  bottom: 72rpx;
+  width: 108rpx;
+  height: 108rpx;
+  border-radius: 50%;
+  background: var(--primary);
+  color: #fff;
+  font-size: 60rpx;
+  line-height: 104rpx;
+  text-align: center;
+  box-shadow: 0 8rpx 24rpx rgba(52, 190, 140, 0.35);
+  transition: transform 0.16s cubic-bezier(0.22, 1.32, 0.36, 1);
+}
+
+.fab--hover {
+  transform: scale(0.92);
+}
+
+/* ===== 自绘分隔线 =====
+   Vant 的 .van-cell:after / .van-hairline--top-bottom:after 颜色硬编码为 #ebedf0，
+   深色下会露出刺眼的浅色线，因此关闭原生 border 后统一用它替代。 ===== */
+.row-divider {
+  height: 1rpx;
+  background: var(--border-color);
+  margin: 0 24rpx;
+}
+
+/* ===== 主按钮撑满 =====
+   Vant 的 block 属性在 glass-easel 下未生效，且原生 button 自带 margin:0 auto
+   会阻止在 flex 容器中拉伸，因此统一用样式兜底（必须带 margin: 0）。 ===== */
+.act-btn {
+  display: flex;
+  width: 100%;
+  margin: 0;
+}
+
+/* ===== 这里原本有一段"跟随系统深色"的媒体查询兜底，现已移除 =====
+   原因：它跟随的是**系统**配色，而主题模式允许"系统深色 + 应用内选浅色"。
+   那种组合下它会把 page 根元素的变量刷成深色，于是切换 tab 页时会先闪一屏深色
+   （用户报的"手机深色 + 应用内浅色，切 tab 会闪屏"就是它）。
+   现在颜色的唯一来源是 utils/theme.ts 经 <page-meta page-style> 注入的内联变量：
+   它同时覆盖"跟随系统"与"手动指定"两种模式，比媒体查询更准，也不会与手动选择打架。
+   首帧兜底用本文件顶部 page 上的浅色默认值。 */
+
+/* ===== 覆盖 Vant 分组卡片的发丝线颜色 =====
+   .van-hairline--top-bottom:after 里写死了 #ebedf0，深色下会在卡片上下边缘露出浅色缝隙 */
+.cell-card::after {
+  border-color: var(--border-color) !important;
+}

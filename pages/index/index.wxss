@@ -1,0 +1,81 @@
+/* .page 骨架、.summary 卡片与文案样式已在 app.wxss 中统一定义，此处只保留本页差异 */
+
+.page {
+  padding: var(--space-page) 0 60rpx;
+}
+
+.summary {
+  margin: 0 var(--space-page) 24rpx;
+}
+
+.summary__foot {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 24rpx;
+  font-size: var(--font-hint);
+  color: var(--sub-text-color);
+}
+
+.quick-grid {
+  margin: 0 var(--space-page) 24rpx;
+  background: var(--card-bg);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+}
+
+.section { margin-top: var(--space-section); }
+
+/* ===== 到期待办横幅（不打扰式，常驻展示，点击去记事页） ===== */
+.todo-banner {
+  display: flex;
+  align-items: center;
+  padding: 20rpx 28rpx;
+  background: var(--danger-soft);
+  border-radius: var(--radius-card, 24rpx);
+  color: var(--danger);
+  font-size: var(--font-hint, 24rpx);
+  transition: transform 0.16s ease, opacity 0.16s ease;
+}
+
+.todo-banner--hover {
+  transform: scale(0.985);
+  opacity: 0.9;
+}
+
+.todo-banner__text {
+  flex: 1;
+  margin-left: 12rpx;
+  font-weight: 500;
+}
+
+.todo-banner__more {
+  color: var(--danger);
+  opacity: 0.8;
+}
+
+.section__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 var(--space-page) 16rpx;
+}
+
+.section__title {
+  font-size: var(--font-body);
+  font-weight: 500;
+  color: var(--text-color);
+}
+
+/* 点击区域比文字大一圈，更好按（负外边距抵消多出的 padding，视觉位置不变） */
+.section__more {
+  margin: -16rpx -12rpx -16rpx 0;
+  padding: 16rpx 12rpx;
+  font-size: var(--font-hint);
+  color: var(--sub-text-color);
+  transition: opacity 0.16s ease;
+}
+
+.section__more--hover {
+  opacity: 0.55;
+}

@@ -1,0 +1,79 @@
+/* .page 骨架、.swipe-act（左滑/右滑操作块）、.fab、.enter / .row-collapse 已在 app.wxss 中统一定义，此处只保留本页差异 */
+
+.page {
+  /* 底部多留 120rpx：给多选操作条 / 撤销条留出空间 */
+  padding: var(--space-page) 0 340rpx;
+}
+
+.list {
+  margin-top: var(--space-gap);
+}
+
+/* 待办完成度进度条：夹在页签与列表之间（van-tabs 自身已带 24rpx 下边距） */
+.progress-row {
+  margin: 0 var(--space-page);
+}
+
+/*
+  多选态下给 note-item 的勾选圈让位（真 bug：勾被挤出卡片外看不见）
+  ------------------------------------------------------------------
+  平时：卡片内边距 32rpx + 勾选圈 44rpx + 圈右 24rpx，正常。
+  多选：行首又多出 .pick--in（56rpx 宽 + 16rpx 右距 = 72rpx），合计 172rpx，
+        卡片内可写宽度被压到溢出 —— 勾选圈所在的 flex 行被挤掉，
+        圈和勾一起被裁（用户看到的就是"复选框选中效果的钩子被隐藏了"）。
+  解法：多选态把卡片左内边距收到 20rpx、勾选圈右距收到 12rpx，
+        省出 24rpx；间距主要由行首选择位承担，避免两套间距叠加。
+  注：这两个选择器要命中 note-item 组件内部节点，页面 wxss 对组件内部是有效的
+      （组件默认 styleIsolation 下，页面样式能作用于其内部节点——本项目一直这么用），
+      但不能加 styleIsolation: isolated，否则要去组件内部改。
+*/
+.row-inner--picking .note {
+  padding-left: 20rpx;
+}
+
+.row-inner--picking .note__check {
+  margin-right: 12rpx;
+}
+
+/*
+  删除块的宽度 / 高度 / 圆角统一在 app.wxss 的 .swipe-del 里定义（= right-width 144），本页不再覆盖。
+  另：行容器早已改为 .card-row 提供左右留白，条目自身不再带外边距，两个列表的留白因此完全一致。
+*/
+
+/* van 组件深色适配（依赖 Vant 组件的 addGlobalClass，故只能用页面选择器 + !important 覆盖） */
+.van-search {
+  background-color: var(--bg-color) !important;
+}
+.van-search__content {
+  background-color: var(--card-bg) !important;
+  border: 1rpx solid var(--border-color);
+}
+.van-search__field {
+  color: var(--text-color) !important;
+}
+.van-search__placeholder {
+  color: var(--sub-text-color) !important;
+}
+.van-search__icon {
+  color: var(--sub-text-color) !important;
+}
+
+.van-tabs {
+  margin: 24rpx 0;
+}
+.van-tab {
+  color: var(--sub-text-color) !important;
+}
+.van-tab--active {
+  color: var(--primary) !important;
+}
+.van-tabs__line {
+  background-color: var(--primary) !important;
+}
+
+.van-empty__description {
+  color: var(--sub-text-color) !important;
+}
+.van-empty__image {
+  filter: invert(85%);
+}

@@ -1,0 +1,24 @@
+<!-- 单击待办 = 完成/取消完成（整条可点）；单击笔记只给一次轻提示；长按进编辑 -->
+<view
+  class="note"
+  hover-class="note--hover"
+  hover-stay-time="80"
+  bind:longpress="onLongPress"
+  bindtap="onTap"
+>
+  <view
+    wx:if="{{ isTodo }}"
+    class="note__check {{ item.done ? 'is-done' : '' }}"
+    catchtap="onToggle"
+  >
+    <van-icon wx:if="{{ item.done }}" name="success" size="24rpx" color="#ffffff" />
+  </view>
+  <view class="note__body">
+    <text class="note__content {{ item.done ? 'is-done' : '' }}">{{ item.content }}</text>
+    <view class="note__meta">
+      <text class="note__time">{{ timeText }}</text>
+      <text wx:if="{{ dueEnabled }}" class="note__due note__due--{{ dueState }}">{{ dueText }}</text>
+      <text wx:if="{{ isTodo }}" class="note__kind">{{ item.done ? '已完成' : '待办' }}</text>
+    </view>
+  </view>
+</view>

@@ -1,0 +1,11 @@
+<!-- 进度条：标题 + 数值 + 按档位变色的条 + 一行说明 -->
+<view class="pg">
+  <view class="pg__head">
+    <text class="pg__label">{{ label }}</text>
+    <text class="pg__value">{{ value }}</text>
+  </view>
+  <view class="pg__track">
+    <view class="pg__fill pg__fill--{{ level }}" style="width: {{ percent }}%"></view>
+  </view>
+  <text wx:if="{{ hint }}" class="pg__hint">{{ hint }}</text>
+</view>

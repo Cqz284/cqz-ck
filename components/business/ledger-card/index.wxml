@@ -1,0 +1,18 @@
+<!-- 长按编辑（单击不再进入编辑，只给一次轻提示）；hover-class 同时充当长按时的按下反馈 -->
+<view
+  class="card"
+  hover-class="card--hover"
+  hover-stay-time="80"
+  bind:longpress="onLongPress"
+  bindtap="onTap"
+>
+  <view class="card__badge {{ isIncome ? 'card__badge--income' : 'card__badge--expense' }}">{{ initial }}</view>
+  <view class="card__main">
+    <view class="card__title-row">
+      <text class="card__tag">{{ record.tag || (isIncome ? '收入' : '支出') }}</text>
+      <text class="card__time">{{ timeText }}</text>
+    </view>
+    <text class="card__remark" wx:if="{{ record.remark }}">{{ record.remark }}</text>
+  </view>
+  <text class="card__amount {{ isIncome ? 'amount--income' : 'amount--expense' }}">{{ amountText }}</text>
+</view>

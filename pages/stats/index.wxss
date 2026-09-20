@@ -1,0 +1,405 @@
+/* .page 骨架、.segment、.enter 已在 app.wxss 中统一定义 */
+
+.page {
+  padding: var(--space-page) 0 80rpx;
+}
+
+/* ===== 时间范围切换 ===== */
+.month {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 24rpx;
+}
+
+.month__nav {
+  width: 72rpx;
+  height: 72rpx;
+  line-height: 68rpx;
+  text-align: center;
+  border-radius: 50%;
+  background: var(--card-bg);
+  color: var(--text-color);
+  font-size: 36rpx;
+  box-shadow: var(--shadow-card);
+  transition: transform 0.16s ease, opacity 0.16s ease;
+}
+
+.month__nav--hover {
+  transform: scale(0.92);
+  opacity: 0.85;
+}
+
+/* 已到当前月/今天：右侧按钮变灰且不再响应 */
+.month__nav--off {
+  color: var(--sub-text-color);
+  opacity: 0.45;
+}
+
+/* 日期本身是一个按钮（点它弹年月日选择器），所以做成有热区的胶囊而不是纯文字 */
+.month__date {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 280rpx;
+  margin: 0 12rpx;
+  padding: 10rpx 20rpx;
+  border-radius: var(--radius-control);
+  transition: background-color 0.18s ease;
+}
+
+.month__date--hover {
+  background: var(--border-color);
+}
+
+.month__label {
+  font-size: var(--font-title);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-color);
+}
+
+/* 下拉小箭头：靠包裹层传色（van-icon 默认 color: inherit），深浅色主题都自动跟随 */
+.month__caret {
+  display: flex;
+  margin-left: 8rpx;
+  color: var(--sub-text-color);
+}
+
+/* ===== 单日模式的辅助行 ===== */
+.range {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: -12rpx 0 24rpx;
+}
+
+.range__badge {
+  font-size: var(--font-hint);
+  color: var(--sub-text-color);
+}
+
+.range__back {
+  margin-left: 20rpx;
+  padding: 6rpx 20rpx;
+  border-radius: var(--radius-pill);
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-size: var(--font-hint);
+  transition: transform 0.16s ease, opacity 0.16s ease;
+}
+
+.range__back--hover {
+  transform: scale(0.94);
+  opacity: 0.88;
+}
+
+/* 分段控件选中态配色统一在 app.wxss（页面级选择器命中不了组件内部节点） */
+
+/* ===== 图表卡 ===== */
+.chart-card {
+  margin: 8rpx var(--space-page) 0;
+  padding: var(--space-card);
+  background: var(--card-bg);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+}
+
+.chart {
+  position: relative;
+  width: 100%;
+  /* 高度由 canvas 撑开：canvas 自身有固定宽高，这里只做居中 */
+  display: flex;
+  justify-content: center;
+}
+
+.chart__canvas {
+  width: 460rpx;
+  height: 460rpx;
+}
+
+/* 中心文案：绝对定位叠在环内，颜色跟随主题令牌 */
+.chart__center {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 240rpx;
+  text-align: center;
+  pointer-events: none;
+}
+
+.chart__center-label {
+  display: block;
+  font-size: var(--font-hint);
+  color: var(--sub-text-color);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.chart__center-value {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 36rpx;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-color);
+}
+
+.chart__center-hint {
+  display: block;
+  margin-top: 6rpx;
+  font-size: 20rpx;
+  color: var(--sub-text-color);
+}
+
+/* ===== 图例 ===== */
+.legend {
+  margin-top: 32rpx;
+  border-top: 1rpx solid var(--border-color);
+}.legend__row {
+  display: flex;
+  align-items: center;
+  padding: 22rpx 12rpx;
+  border-radius: var(--radius-control);
+  transition: background-color 0.18s ease, transform 0.16s ease;
+}
+
+.legend__row--hover {
+  background: var(--border-color);
+}
+
+/* 高亮行：主色淡底，与扇区高亮呼应 */
+.legend__row--on {
+  background: var(--primary-soft);
+}
+
+.legend__dot {
+  width: 20rpx;
+  height: 20rpx;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-right: 20rpx;
+}
+
+.legend__label {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--font-body);
+  color: var(--text-color);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.legend__ratio {
+  width: 120rpx;
+  text-align: right;
+  font-size: var(--font-hint);
+  color: var(--sub-text-color);
+  font-variant-numeric: tabular-nums;
+}
+
+.legend__value {
+  min-width: 180rpx;
+  text-align: right;
+  font-size: var(--font-body);
+  color: var(--text-color);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ===== 分类明细（点分类后展开） ===== */
+.detail {
+  margin: 24rpx var(--space-page) 0;
+  padding: var(--space-card);
+  background: var(--card-bg);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  /* 整块淡入：与分类高亮呼应，给用户"这里展开了明细"的反馈 */
+  animation: detail-in 0.34s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes detail-in {
+  from { opacity: 0; transform: translateY(14rpx); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.detail__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 8rpx;
+}
+
+.detail__title {
+  font-size: var(--font-body);
+  font-weight: 500;
+  color: var(--text-color);
+}
+
+.detail__count {
+  font-size: var(--font-hint);
+  color: var(--sub-text-color);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 分组错峰：animation-delay 由各组的 delay 字段驱动（见 stats/index.ts） */
+.detail__group {
+  margin-top: 16rpx;
+  opacity: 0;
+  animation: detail-group-in 0.34s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes detail-group-in {
+  from { opacity: 0; transform: translateY(12rpx); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* 明细卡片容器：只提供行间距，不加左右外边距（.detail 已有内边距） */
+.detail__row {
+  display: flex;
+  flex-direction: column;
+}
+
+/* 卡片宿主节点（ledger-card 的根节点）之间加行间距 */
+.detail__row ledger-card {
+  margin-bottom: var(--space-gap);
+}
+
+.detail__row ledger-card:last-child {
+  margin-bottom: 0;
+}
+
+/* 分组头：左日期、右当日小计（与记账列表的 group__head 一致的口径） */
+.detail__group-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 0 12rpx 12rpx;
+}
+
+.detail__group-label {
+  font-size: var(--font-hint);
+  color: var(--sub-text-color);
+}
+
+.detail__group-sum {
+  font-size: var(--font-hint);
+  color: var(--sub-text-color);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ===== 每日趋势（仅整月模式） ===== */
+.trend-card {
+  margin: 24rpx var(--space-page) 0;
+  padding: var(--space-card);
+  background: var(--card-bg);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  animation: detail-in 0.34s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.trend__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 16rpx;
+}
+
+.trend__title {
+  font-size: var(--font-body);
+  font-weight: 500;
+  color: var(--text-color);
+  flex-shrink: 0;
+}
+
+/* 对比摘要：语义色由 compareKind 驱动（好=主色绿 / 坏=危险红 / 持平与无数据=次级灰） */
+.trend__compare {
+  margin-left: 16rpx;
+  font-size: var(--font-hint);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.trend__compare--good { color: var(--primary); }
+.trend__compare--bad { color: var(--danger); }
+.trend__compare--flat,
+.trend__compare--none { color: var(--sub-text-color); }
+
+.trend {
+  width: 100%;
+  /* 气泡锚定在画布容器内（px 定位与 canvas 逻辑像素一一对应） */
+  position: relative;
+}
+
+.trend__canvas {
+  width: 100%;
+  height: 280rpx;
+}
+
+/* X 轴刻度行：与折线横向等距对齐（两端贴边，中段均分） */
+.trend__ticks {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 4rpx;
+  padding: 0 4rpx;
+  font-size: 20rpx;
+  color: var(--sub-text-color);
+  font-variant-numeric: tabular-nums;
+}
+
+.trend__tick {
+  transform: translateX(0);
+}
+
+.trend__tick:first-child {
+  transform: translateX(0);
+  text-align: left;
+}
+
+.trend__tick:last-child {
+  transform: translateX(0);
+  text-align: right;
+}
+
+/* 选中气泡：默认向上弹出（translateY(-100%)），贴顶的点加 --below 向下弹 */
+.trend__bubble {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12rpx 20rpx;
+  background: var(--card-bg);
+  border: 1rpx solid var(--border-color);
+  border-radius: var(--radius-card, 16rpx);
+  box-shadow: var(--shadow-card);
+  white-space: nowrap;
+  pointer-events: auto;
+  z-index: 2;
+}
+
+.trend__bubble--below {
+  transform: translate(-50%, 0);
+}
+
+.trend__bubble-text {
+  font-size: var(--font-hint, 24rpx);
+  font-weight: 500;
+  color: var(--text-color);
+  font-variant-numeric: tabular-nums;
+}
+
+.trend__bubble-cta {
+  margin-top: 4rpx;
+  font-size: 20rpx;
+  color: var(--sub-text-color);
+}
+
+.trend__hint {
+  margin-top: 8rpx;
+  font-size: 20rpx;
+  color: var(--sub-text-color);
+  text-align: center;
+}

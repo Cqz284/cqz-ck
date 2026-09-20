@@ -1,0 +1,84 @@
+<!-- page-style 落在 page 根元素上：底部吸底操作条与 .page 平级，只有这样才能吃到主题变量 -->
+<page-meta page-style="{{pageStyle}}"></page-meta>
+<navigation-bar title="{{ isEdit ? '编辑' : '写点什么' }}" back="{{true}}" color="{{navBarColor}}" background="{{navBarBg}}"></navigation-bar>
+
+<view class="page" style="{{pageStyle}}">
+  <view class="segment enter">
+    <view class="segment__pill {{ kind === 'todo' ? 'is-todo' : '' }}"></view>
+    <view class="segment__item {{ kind === 'plain' ? 'is-active' : '' }}" hover-class="segment__item--hover" data-kind="plain" bindtap="setKind">
+      <van-icon class="segment__icon" name="notes-o" size="30rpx" />
+      <text>普通笔记</text>
+    </view>
+    <view class="segment__item {{ kind === 'todo' ? 'is-active' : '' }}" hover-class="segment__item--hover" data-kind="todo" bindtap="setKind">
+      <van-icon class="segment__icon" name="todo-list-o" size="30rpx" />
+      <text>待办</text>
+    </view>
+  </view>
+
+  <!-- 用一层 view 承载入场动画：custom-class 会把类名挂到组件内部节点上，
+       与写在标签上的 style 不同节点，动画与延迟会各挂一半 -->
+  <view class="enter" style="animation-delay: 60ms">
+    <van-cell-group inset="{{true}}" custom-class="cell-card">
+      <van-field
+        value="{{ content }}"
+        type="textarea"
+        placeholder="写点什么…"
+        autosize="{{true}}"
+        maxlength="2000"
+        show-word-limit="{{true}}"
+        border="{{false}}"
+        bind:change="onContent"
+      />
+    </van-cell-group>
+  </view>
+
+  <!-- 截止时间：仅待办显示。原生 date/time 双选择器 + 两个快捷项，
+       日期与时间都选了才生效（半截选择在行上有提示） -->
+  <view class="enter" style="animation-delay: 120ms" wx:if="{{ kind === 'todo' }}">
+    <view class="due-card">
+      <view class="due-card__head">
+        <text class="due-card__label">截止时间</text>
+        <view
+          wx:if="{{ dueDate || dueHM }}"
+          class="due-card__clear"
+          hover-class="due-card__clear--hover"
+          bindtap="onDueClear"
+        >清除</view>
+      </view>
+      <view class="due-card__value {{ dueLabel ? '' : 'is-empty' }}">{{ dueLabel || '不设置' }}</view>
+      <view class="due-card__actions">
+        <picker
+          class="due-card__picker"
+          mode="date"
+          value="{{ dueDate || todayDate }}"
+          start="{{ todayDate }}"
+          bindchange="onDueDate"
+        >
+          <view class="due-chip" hover-class="due-chip--hover">选日期</view>
+        </picker>
+        <picker
+          class="due-card__picker"
+          mode="time"
+          value="{{ dueHM || '20:00' }}"
+          bindchange="onDueTime"
+        >
+          <view class="due-chip" hover-class="due-chip--hover">选时间</view>
+        </picker>
+        <view class="due-chip" hover-class="due-chip--hover" data-type="tonight" bindtap="onDueQuick">今天 20:00</view>
+        <view class="due-chip" hover-class="due-chip--hover" data-type="tomorrow" bindtap="onDueQuick">明天 09:00</view>
+      </view>
+    </view>
+  </view>
+</view>
+
+<!-- 吸底操作条：只放保存。独占整行即水平居中，大小与之前完全一致；
+     删除不再进编辑页，统一走列表左滑 / 多选批量删除，避免同一个动作有两个入口、两种语义。 -->
+<view class="edit-bar">
+  <van-button
+    type="primary"
+    round="{{true}}"
+    custom-class="act-btn"
+    custom-style="flex: 1; margin: 0;"
+    bind:click="onSubmit"
+  >保存</van-button>
+</view>

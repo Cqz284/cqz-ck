@@ -1,0 +1,165 @@
+<page-meta page-style="{{pageStyle}}"></page-meta>
+<!-- 多选入口不再占用导航栏：右滑单条记录即进入多选，多选态下左滑即退出（见下方左/右槽位） -->
+<navigation-bar title="记账" back="{{false}}" color="{{navBarColor}}" background="{{navBarBg}}"></navigation-bar>
+
+<view class="page" style="{{pageStyle}}">
+  <view class="summary enter">
+    <text class="summary__label">本月结余</text>
+    <text class="summary__balance amount {{ balanceClass }}">{{ balanceText }}</text>
+    <view class="summary__row">
+      <view class="summary__col">
+        <text class="summary__k">收入</text>
+        <text class="summary__v amount--income">{{ incomeText }}</text>
+      </view>
+      <view class="summary__col">
+        <text class="summary__k">支出</text>
+        <text class="summary__v amount--expense">{{ expenseText }}</text>
+      </view>
+    </view>
+    <!-- 分类占比：与首页同一张卡、同一条口径，点详情进完整环形图（无支出时整块不占位） -->
+    <view class="summary__mix" wx:if="{{ mixItems.length }}">
+      <mix-bar
+        title="本月支出构成"
+        total-text="{{ mixTotalText }}"
+        items="{{ mixItems }}"
+        bind:open="goStats"
+      />
+    </view>
+  </view>
+
+  <view class="group" wx:for="{{ groups }}" wx:key="date" wx:for-item="group" wx:for-index="gi">
+    <view class="group__head enter" style="animation-delay: {{ gi * 60 }}ms">
+      <text class="group__label">{{ group.label }}</text>
+      <text class="group__sum">{{ group.summaryText }}</text>
+    </view>
+    <!--
+      外层 .card-row：提供左右页面留白与行间距（卡片自身不带外边距，删除块才能与卡片严丝合缝）
+      外层 .row-collapse：整行收起的动画容器（删除时先钉住实测高度，下一帧再收到 0）
+      内层 .row-inner：多选时行首展开选择位，卡片自动让位；非多选时选择位宽度为 0，布局与之前完全一致
+    -->
+    <view
+      wx:for="{{ group.items }}"
+      wx:key="id"
+      wx:for-item="item"
+      wx:for-index="ii"
+      id="cell-{{ item.id }}"
+      class="card-row row-collapse {{ pickMap[item.id] ? 'row-picked' : '' }} {{ shrinkingMap[item.id] ? 'row-collapse--out' : '' }}"
+      style="{{ pinnedMap[item.id] ? 'max-height:' + pinnedMap[item.id] + 'px;' : '' }}"
+    >
+      <view class="row-inner">
+        <view class="pick {{ selecting ? 'pick--in' : '' }}" catchtap="onPick" data-id="{{ item.id }}">
+          <view class="pick__box {{ pickMap[item.id] ? 'is-on' : '' }}">
+            <van-icon wx:if="{{ pickMap[item.id] }}" name="success" size="24rpx" color="#ffffff" />
+          </view>
+        </view>
+        <view class="row-main">
+          <!--
+            入场动画放在 van-swipe-cell 上：入场用 animation、收起用 transition，
+            若放在同一节点，animation 的 fill-mode 会永久压住 transform，收起位移就失效了。
+
+            两个槽位对应两个手势，滑到阈值即触发（不必再点一下）：
+            - 左槽（右滑露出）：多选入口。多选态下 left-width 归零，Vant 会据此把已滑开的行自动收回
+            - 右槽（左滑露出）：平时是「删除」，多选态换成「退出」
+            name 用记录 id：Vant 的 open 事件 detail 自带 name，不必依赖 dataset 透传
+
+            ⚠️ 两个 slot 都是"随时挂在文档里"的静态节点，显隐由 .swipe-act--hidden 切换。
+            绝不能改成 wx:if 让 slot 节点整体出现/消失：节点结构一变，glass-easel 重新展开
+            这两个插槽时，会把 header 里的 left-width / right-width 又写一遍（等价于宽度变化），
+            触发 Vant 的宽度 observer，把正在收起的那一行按新宽度重新滑开 —— 现象就是"滑不动"。
+            右槽用**两个并列的 view** 而不是 wx:if/wx:else：wx:else 也是"节点换一个"，
+            虽然比整块消失温和，但并列 + 类切换是唯一完全不改节点数的写法。
+          -->
+          <van-swipe-cell
+            id="swipe-{{ item.id }}"
+            name="{{ item.id }}"
+            data-name="{{ item.id }}"
+            class="swipe-cell enter"
+            style="animation-delay: {{ gi * 60 + ii * 40 }}ms"
+            left-width="{{ swipeReset || selecting || openSideMap[item.id] === 'right' ? 0 : swipeWidth }}"
+            right-width="{{ swipeReset || openSideMap[item.id] === 'left' ? 0 : swipeWidth }}"
+            bind:open="onSwipeOpen"
+            bind:click="onCellTap"
+            bind:touchend="onCellTouchEnd"
+          >
+            <ledger-card
+              record="{{ item }}"
+              currency="{{ currency }}"
+              selectable="{{ selecting }}"
+              bind:edit="onEdit"
+              bind:pick="onPick"
+            />
+            <!-- 多选态：左滑露出「退出」，滑到阈值即退出多选。
+                 退出后这一行还在收起动画里（exitMap），此间继续显示中性色块，避免闪成红色删除块 -->
+            <view
+              wx:if="{{ selecting || exitMap[item.id] }}"
+              slot="right"
+              class="swipe-act swipe-act--muted"
+              hover-class="swipe-act--active"
+              hover-stay-time="60"
+              bindtap="exitSelect"
+            >
+              <van-icon name="cross" size="36rpx" color="#ffffff" />
+              <text class="swipe-act__label">退出</text>
+            </view>
+            <!-- 平时：左滑露出「删除」 -->
+            <view
+              wx:else
+              slot="right"
+              class="swipe-act swipe-act--danger"
+              hover-class="swipe-act--active"
+              hover-stay-time="60"
+              data-id="{{ item.id }}"
+              bindtap="onDelete"
+            >
+              <van-icon name="delete-o" size="36rpx" color="#ffffff" />
+              <text class="swipe-act__label">删除</text>
+            </view>
+            <!-- 右滑露出「多选」：滑开即进入多选并选中这一条；滑出来再点它也走同一条路径 -->
+            <view
+              wx:if="{{ !selecting }}"
+              slot="left"
+              class="swipe-act swipe-act--primary"
+              hover-class="swipe-act--active"
+              hover-stay-time="60"
+              data-id="{{ item.id }}"
+              bindtap="onEnterSelect"
+            >
+              <van-icon name="records" size="36rpx" color="#ffffff" />
+              <text class="swipe-act__label">多选</text>
+            </view>
+          </van-swipe-cell>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <empty-state
+    wx:if="{{ groups.length === 0 }}"
+    class="enter"
+    style="animation-delay: 120ms"
+    icon="balance-o"
+    text="还没有记录，记下第一笔吧"
+    action-text="记一笔"
+    bind:action="goEdit"
+  />
+</view>
+
+<view wx:if="{{ !selecting }}" class="fab" hover-class="fab--hover" hover-stay-time="80" bindtap="goEdit">＋</view>
+
+<!-- 多选操作条：全选 + 批量删除 -->
+<view class="pick-bar {{ selecting ? 'pick-bar--in' : '' }}">
+  <view class="pick-bar__all" hover-class="nav-act--hover" hover-stay-time="60" bindtap="onPickAll">
+    <view class="pick__box {{ allPicked ? 'is-on' : '' }}">
+      <van-icon wx:if="{{ allPicked }}" name="success" size="24rpx" color="#ffffff" />
+    </view>
+    <text class="pick-bar__label">全选</text>
+  </view>
+  <view
+    class="pick-bar__btn {{ pickedCount ? '' : 'pick-bar__btn--off' }}"
+    hover-class="pick-bar__btn--hover"
+    hover-stay-time="60"
+    bindtap="onDeletePicked"
+  >{{ pickedCount ? '删除 ' + pickedCount + ' 条' : '删除' }}</view>
+</view>
+
+<undo-bar show="{{ undoVisible }}" text="{{ undoText }}" bind:undo="onUndo" bind:expire="onUndoExpire" />

@@ -1,0 +1,56 @@
+.pg {
+  width: 100%;
+}
+
+.pg__head {
+  display: flex;
+  align-items: baseline;
+}
+
+.pg__label {
+  font-size: var(--font-hint, 22rpx);
+  color: var(--sub-text-color);
+}
+
+.pg__value {
+  /* 数值靠右：一眼能看到"用了多少 / 额度多少" */
+  margin-left: auto;
+  font-size: var(--font-sub, 24rpx);
+  font-weight: 500;
+  color: var(--text-color);
+  font-variant-numeric: tabular-nums;
+}
+
+.pg__track {
+  height: 16rpx;
+  margin-top: 14rpx;
+  border-radius: var(--radius-pill, 999rpx);
+  background: var(--border-color);
+  overflow: hidden;
+}
+
+.pg__fill {
+  height: 100%;
+  border-radius: var(--radius-pill, 999rpx);
+  /* 宽度带过渡：额度变化（记一笔回来）时条会平滑长过去，而不是啪地跳 */
+  transition: width 0.32s cubic-bezier(0.22, 1, 0.36, 1), background 0.24s ease;
+}
+
+.pg__fill--normal {
+  background: var(--primary);
+}
+
+.pg__fill--warn {
+  background: var(--accent);
+}
+
+.pg__fill--over {
+  background: var(--danger);
+}
+
+.pg__hint {
+  display: block;
+  margin-top: 10rpx;
+  font-size: var(--font-hint, 22rpx);
+  color: var(--sub-text-color);
+}

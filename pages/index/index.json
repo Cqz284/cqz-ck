@@ -1,0 +1,11 @@
+{
+  "usingComponents": {
+    "navigation-bar": "/components/navigation-bar/navigation-bar",
+    "ledger-card": "/components/business/ledger-card/index",
+    "note-item": "/components/business/note-item/index",
+    "progress-bar": "/components/business/progress-bar/index",
+    "empty-state": "/components/empty-state/index",
+    "van-grid": "@vant/weapp/grid/index",
+    "van-grid-item": "@vant/weapp/grid-item/index"
+  }
+}

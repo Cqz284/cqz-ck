@@ -1,0 +1,89 @@
+.mix {
+  transition: opacity 0.16s ease;
+}
+
+.mix--hover {
+  opacity: 0.72;
+}
+
+.mix__head {
+  display: flex;
+  align-items: baseline;
+}
+
+.mix__title {
+  font-size: var(--font-hint, 22rpx);
+  color: var(--sub-text-color);
+}
+
+/* 合计金额贴着左侧标题，详情入口靠右 */
+.mix__total {
+  margin-left: 12rpx;
+  font-size: var(--font-sub, 24rpx);
+  font-weight: 500;
+  color: var(--text-color);
+  font-variant-numeric: tabular-nums;
+}
+
+.mix__more {
+  margin-left: auto;
+  font-size: var(--font-hint, 22rpx);
+  color: var(--sub-text-color);
+}
+
+/* 占比条：段之间留 2rpx 缝隙，圆角靠外层裁切 */
+.mix__bar {
+  display: flex;
+  height: 14rpx;
+  margin-top: 16rpx;
+  border-radius: var(--radius-pill, 999rpx);
+  overflow: hidden;
+  background: var(--border-color);
+}
+
+.mix__seg {
+  height: 100%;
+  /* 细缝用右内边距做：border-box 保证"含缝隙的总宽"仍等于占比之和，不会溢出 */
+  box-sizing: border-box;
+  border-right: 2rpx solid var(--card-bg);
+}
+
+.mix__seg:last-child {
+  border-right: none;
+}
+
+.mix__legend {
+  display: flex;
+  flex-wrap: wrap;
+  margin-top: 14rpx;
+}
+
+.mix__item {
+  display: flex;
+  align-items: center;
+  margin: 4rpx 24rpx 4rpx 0;
+}
+
+.mix__dot {
+  width: 14rpx;
+  height: 14rpx;
+  border-radius: 50%;
+  margin-right: 10rpx;
+  flex-shrink: 0;
+}
+
+.mix__label {
+  font-size: var(--font-hint, 22rpx);
+  color: var(--text-color);
+  max-width: 200rpx;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.mix__pct {
+  margin-left: 8rpx;
+  font-size: var(--font-hint, 22rpx);
+  color: var(--sub-text-color);
+  font-variant-numeric: tabular-nums;
+}

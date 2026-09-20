@@ -1,0 +1,9 @@
+<view class="empty">
+  <view class="empty__icon">
+    <van-icon name="{{ icon }}" size="64rpx" color="var(--sub-text-color)" />
+  </view>
+  <text class="empty__text">{{ text }}</text>
+  <view wx:if="{{ actionText }}" class="empty__action" hover-class="empty__action--hover" bindtap="onAction">
+    {{ actionText }}
+  </view>
+</view>
