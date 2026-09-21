@@ -17,3 +17,4 @@ project.private.config.json
 npm-debug.log*
 yarn-error.log*
 *.tsbuildinfo
+.tmp_hint.png
