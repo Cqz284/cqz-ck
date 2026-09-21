@@ -81,14 +81,17 @@ const MARKERS = [
   ['pages/notes/list/index.ts', 'onSearchScrollHide(scrollTop: number) {', '记事列表下滑自动收起搜索行（方法）'],
   ['pages/notes/list/index.ts', 'this.onSearchScrollHide(e.scrollTop);', '记事列表滚动驱动搜索行收起（调用点）'],
   ['pages/notes/list/index.ts', 'collapseSearch() {', '记事列表滚动收起（保留关键词，方法）'],
-  // 失焦自动收起（2026-09-21 第五轮）：blur 后延迟 SEARCH_BLUR_HIDE_MS 收起（保留关键词）。
+  // 失焦自动收起（2026-09-21 第五轮，第六轮收窄口径）：blur 后延迟 SEARCH_BLUR_HIDE_MS 收起（保留关键词）。
   // ⚠️ 延迟是给「点导航栏图标」让路 —— 点图标那一下 input 先 blur，立即收起的话
   // onToggleSearch 会看到"未展开"而把它重新展开；开合入口必须先 clearSearchBlurHide()
+  // ⚠️ 第六轮：只在输入框为空时失焦才收 —— 有关键词时用户在浏览结果，收了输入行反而打断
   ['pages/ledger/list/index.wxml', 'bind:blur="onSearchBlur"', '记账列表搜索失焦自动收起（调用点）'],
-  ['pages/ledger/list/index.ts', 'onSearchBlur() {', '记账列表搜索失焦收起（方法）'],
+  ['pages/ledger/list/index.ts', 'onSearchBlur(e: { detail?: string | { value?: string } }) {', '记账列表搜索失焦收起（方法）'],
+  ['pages/ledger/list/index.ts', 'if (String(raw).trim() || this.data.keyword.trim()) return;', '记账列表失焦收起仅限空输入（有内容不收）'],
   ['pages/ledger/list/index.ts', 'clearSearchBlurHide() {', '记账列表失焦收起作废（防点图标竞争）'],
   ['pages/notes/list/index.wxml', 'bind:blur="onSearchBlur"', '记事列表搜索失焦自动收起（调用点）'],
-  ['pages/notes/list/index.ts', 'onSearchBlur() {', '记事列表搜索失焦收起（方法）'],
+  ['pages/notes/list/index.ts', 'onSearchBlur(e: { detail?: string | { value?: string } }) {', '记事列表搜索失焦收起（方法）'],
+  ['pages/notes/list/index.ts', 'if (String(raw).trim() || this.data.keyword.trim()) return;', '记事列表失焦收起仅限空输入（有内容不收）'],
   ['pages/notes/list/index.ts', 'clearSearchBlurHide() {', '记事列表失焦收起作废（防点图标竞争）'],
   // 导航栏标题绝对定位居中（右侧插槽放搜索图标后，flex 流内布局会把标题挤偏）
   ['components/navigation-bar/navigation-bar.wxss', 'bottom: 0;\n  height: var(--height);', '导航栏标题绝对定位居中且贴底（不随左右插槽宽度偏移，也不吃状态栏高度的亏）'],

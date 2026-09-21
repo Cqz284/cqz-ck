@@ -86,7 +86,7 @@ interface NotesListCustom extends SwipeSelectMethods {
   /** 页面滚动驱动的自动收起（onPageScroll 调用）：向下滚过阈值才收 */
   onSearchScrollHide(scrollTop: number): void;
   /** 输入框失焦 → 延迟收起搜索行（保留关键词；实现里有与点图标的竞争说明） */
-  onSearchBlur(): void;
+  onSearchBlur(e: { detail?: string | { value?: string } }): void;
   /** 作废待执行的失焦收起 */
   clearSearchBlurHide(): void;
   setFilter(e: { detail: { index: number } }): void;
@@ -319,12 +319,18 @@ Page<NotesListData, NotesListCustom>(
 
       /**
        * 失焦自动收起（van-search 的 blur：点了页面其它地方 / 键盘「完成」）
-       * 口径与滚动收起一致：只收输入行、保留关键词（过滤结果还在下面，清词会让列表跳回全部）。
+       * 口径：只在输入框为空时收起 —— 有关键词时用户多半是在浏览结果，
+       * 收掉输入行反而打断（点图标能随时重新展开）。空着失焦才收。
+       * 只收输入行、保留关键词（过滤结果还在下面，清词会让列表跳回全部）。
        * 延迟 SEARCH_BLUR_HIDE_MS 是给「点导航栏图标」让路 —— 点图标那一下
        * input 先 blur，立即收起的话 onToggleSearch 会看到"未展开"而把它重新展开。
+       * blur 事件 detail 就是当前输入值（vant 透传），用它判断可避开防抖落库延迟。
        */
-      onSearchBlur() {
+      onSearchBlur(e: { detail?: string | { value?: string } }) {
         if (!this.data.searchOpen) return;
+        const d = e?.detail;
+        const raw = typeof d === 'string' ? d : d?.value ?? '';
+        if (String(raw).trim() || this.data.keyword.trim()) return;
         if (this.searchBlurHideTimer) clearTimeout(this.searchBlurHideTimer);
         this.searchBlurHideTimer = setTimeout(() => {
           this.searchBlurHideTimer = null;
