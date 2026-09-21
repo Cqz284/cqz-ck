@@ -30,6 +30,9 @@
 - 设置归一化**逐字段拷贝**，不要展开 `...s`（未知字段会被写回存储漂下去），见 `settings.service.ts`
 - 页级 wxss 命不中组件内部节点（apply-shared 只到组件根），van-tabs 页签样式必须写 `app.wxss` 并删页面同名规则
 - `.workbuddy/tools/verify-project.js` 认 `index.*` 与 `<目录名>.*` 两种组件命名
+- 应用名/Logo 唯一口径 `utils/app-info.ts`（APP_NAME='胖鼠手账'、APP_LOGO='/assets/app-logo.png'）；
+  我的页/关于页 Logo 是 `<image>`，导出头拼接 APP_NAME 不许写死；线上小程序名称与图标在
+  微信公众平台后台配置，代码改不了
 
 ## 主题
 - **只跟随系统**，无手动切换（2026-09-19 已移除三态切换，手动模式与 tabBar 渲染差一帧无法消除）
