@@ -14,9 +14,12 @@
   margin: 0 var(--space-page);
 }
 
-/* ===== 标签筛选行（页签下方）：横向滚动，选中胶囊用主色 ===== */
+/* ===== 标签筛选行（页签下方）：横向滚动 =====
+   与页签/下方内容拉开呼吸感；chip 语言与编辑页对齐：
+   未选 = 幽灵细线（动作项），选中 = 主题绿淡底（有效项） */
 .tag-filter {
-  margin-top: 16rpx;
+  margin-top: 28rpx;
+  margin-bottom: 8rpx;
   white-space: nowrap;
 }
 
@@ -24,28 +27,29 @@
   display: flex;
   flex-wrap: nowrap;
   padding: 0 var(--space-page);
-  gap: 12rpx;
+  gap: 16rpx;
 }
 
 .tag-filter__chip {
   flex-shrink: 0;
-  padding: 8rpx 24rpx;
+  padding: 10rpx 26rpx;
   border-radius: var(--radius-pill, 999rpx);
-  background: var(--card-bg);
-  box-shadow: var(--shadow-card);
-  font-size: var(--font-hint, 22rpx);
+  border: 1rpx solid var(--border-color);
+  background: transparent;
+  font-size: var(--font-hint, 24rpx);
   color: var(--text-color);
-  transition: background 0.16s ease, color 0.16s ease;
+  transition: background 0.16s ease, color 0.16s ease, border-color 0.16s ease;
 }
 
 .tag-filter__chip--hover {
   opacity: 0.85;
 }
 
-/* 选中：主色底、白字，与勾选圈同语言 */
+/* 选中：主题绿淡底 + 主色字（与编辑页快捷 chip 同档），细边转透明保持尺寸不跳 */
 .tag-filter__chip.is-on {
-  background: var(--primary);
-  color: #ffffff;
+  background: var(--primary-soft);
+  border-color: transparent;
+  color: var(--primary);
 }
 
 /*
