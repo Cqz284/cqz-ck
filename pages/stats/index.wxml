@@ -106,35 +106,44 @@
   </view>
 
   <!--
-    点分类看明细：整块淡入 + 分组错峰。
+    点分类看明细：常驻折叠容器 + JS 实测高度（detailH）驱动 height 过渡 ——
+    展开 0→内容高、切换分类 旧高→新高、收起 →0，三个方向都走同一条过渡，
+    多记录分类切到少记录分类时下方内容平滑跟随、不再跳变。
+    内容层用奇偶交替的 detail--t* class 强制重播淡入；detailH===0 时整块淡出。
     记录复用 ledger-card（只读），与记账列表同一张卡片、同一套样式；
     按日期分组，每组带「今天/昨天/9月17日」分组头与当日小计。
   -->
-  <view class="detail" wx:if="{{ showDetail }}">
-    <view class="detail__head">
-      <text class="detail__title">{{ detailLabel }}</text>
-      <text class="detail__count">{{ detailCount }} 笔</text>
-    </view>
-    <view
-      wx:for="{{ detailGroups }}"
-      wx:key="date"
-      wx:for-item="group"
-      class="detail__group"
-      style="animation-delay: {{ group.delay }}ms"
-    >
-      <view class="detail__group-head">
-        <text class="detail__group-label">{{ group.label }}</text>
-        <text class="detail__group-sum">{{ group.sumText }}</text>
+  <view
+    class="detail-wrap {{ detailH === 0 ? 'detail-wrap--closed' : '' }}"
+    wx:if="{{ hasData }}"
+    style="height: {{ detailH }}px"
+  >
+    <view class="detail detail--t{{ detailTick % 2 }}">
+      <view class="detail__head">
+        <text class="detail__title">{{ detailLabel }}</text>
+        <text class="detail__count">{{ detailCount }} 笔</text>
       </view>
-      <view class="detail__row">
-        <ledger-card
-          wx:for="{{ group.items }}"
-          wx:key="id"
-          wx:for-item="item"
-          record="{{ item }}"
-          currency="{{ currency }}"
-          readonly="{{ true }}"
-        />
+      <view
+        wx:for="{{ detailGroups }}"
+        wx:key="date"
+        wx:for-item="group"
+        class="detail__group"
+        style="animation-delay: {{ group.delay }}ms"
+      >
+        <view class="detail__group-head">
+          <text class="detail__group-label">{{ group.label }}</text>
+          <text class="detail__group-sum">{{ group.sumText }}</text>
+        </view>
+        <view class="detail__row">
+          <ledger-card
+            wx:for="{{ group.items }}"
+            wx:key="id"
+            wx:for-item="item"
+            record="{{ item }}"
+            currency="{{ currency }}"
+            readonly="{{ true }}"
+          />
+        </view>
       </view>
     </view>
   </view>

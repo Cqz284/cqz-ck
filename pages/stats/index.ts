@@ -86,8 +86,10 @@ interface StatsData {
   rows: LegendRow[];
   /** 高亮的分片下标；-1 表示未选中（显示合计） */
   activeIndex: number;
-  /** 分类明细：是否展开 */
-  showDetail: boolean;
+  /** 分类明细折叠容器高度（px，syncDetailHeight 实测写入；0 = 收起） */
+  detailH: number;
+  /** 明细内容版本号：奇偶交替的 detail--t* class 强制重播内容过渡动画 */
+  detailTick: number;
   /** 当前展开的分类名（明细标题） */
   detailLabel: string;
   /** 分类明细总笔数（标题右侧的「共 N 笔」） */
@@ -199,6 +201,10 @@ interface StatsCustom {
   onBackToMonth(): void;
   onLegendTap(e: { currentTarget: { dataset: { i: string | number } } }): void;
   onSliceTap(e: { detail: { x: number; y: number } }): void;
+  /** 收起分类明细（高度过渡到 0；内容保留在折叠容器里被裁掉） */
+  collapseDetail(): void;
+  /** 实测明细内容高度并写回 detailH（展开与切换分类共用） */
+  syncDetailHeight(): void;
   countOfSlice(index: number): number;
   goAdd(): void;
 }
@@ -233,7 +239,8 @@ Page<StatsData, StatsCustom>({
     emptyText: '这个月还没有记录',
     rows: [] as LegendRow[],
     activeIndex: -1,
-    showDetail: false,
+    detailH: 0,
+    detailTick: 0,
     detailLabel: '',
     detailCount: 0,
     detailGroups: [] as DetailGroup[],
@@ -374,8 +381,8 @@ Page<StatsData, StatsCustom>({
         todayStr,
         emptyText: `${rangeLabel}还没有${isIncome ? '收入' : '支出'}记录`,
         activeIndex: -1,
-        // 重算即视为"重新进入该视图"：收起上一次展开的分类明细
-        showDetail: false,
+        // 重算即视为"重新进入该视图"：明细折叠容器直接归零（页面在重建视图，不需要过渡）
+        detailH: 0,
         detailLabel: '',
         detailCount: 0,
         detailGroups: [] as DetailGroup[],
@@ -775,12 +782,9 @@ Page<StatsData, StatsCustom>({
     if (!slice) return;
     haptic('light');
 
-    // 再点同一分类 → 取消高亮并收起明细
+    // 再点同一分类 → 取消高亮并收起明细（高度过渡到 0，不做卸载式消失）
     if (this.data.activeIndex === i) {
-      this.setData({ activeIndex: -1, showDetail: false }, () => {
-        this.paintCenter();
-        this.draw();
-      });
+      this.collapseDetail();
       return;
     }
 
@@ -808,15 +812,20 @@ Page<StatsData, StatsCustom>({
     this.setData(
       {
         activeIndex: i,
-        showDetail: detailGroups.length > 0,
         detailLabel: slice.label,
         detailCount: matched.length,
         detailGroups,
+        // 内容版本 +1：detail--t0/t1 交替，强制重播内容淡入（容器高度另行实测过渡）
+        detailTick: this.data.detailTick + 1,
         centerLabel: slice.label,
         centerValue: formatMoney(slice.value, currency),
         centerHint: `${(slice.ratio * 100).toFixed(1)}%${count ? ` · ${count} 笔` : ''}`,
       },
-      () => this.draw()
+      () => {
+        this.draw();
+        // 内容已按新分类排版：量出实际高度写回 detailH，容器高度从当前值滑到新值
+        this.syncDetailHeight();
+      }
     );
   },
 
@@ -837,17 +846,45 @@ Page<StatsData, StatsCustom>({
       geo.outer
     );
     if (hit < 0) {
-      // 点空白处取消高亮，并收起明细
+      // 点空白处取消高亮，并收起明细（高度过渡到 0）
       if (this.data.activeIndex >= 0) {
         haptic('light');
-        this.setData({ activeIndex: -1, showDetail: false }, () => {
-          this.paintCenter();
-          this.draw();
-        });
+        this.collapseDetail();
       }
       return;
     }
     this.onLegendTap({ currentTarget: { dataset: { i: hit } } });
+  },
+
+  /**
+   * 收起分类明细：容器高度过渡到 0（内容保留在折叠容器里被 overflow 裁掉，
+   * 不做卸载式消失 —— 那正是"切换分类割裂感"的来源）
+   */
+  collapseDetail() {
+    this.setData({ detailH: 0, activeIndex: -1 }, () => {
+      this.paintCenter();
+      this.draw();
+    });
+  },
+
+  /**
+   * 实测明细内容高度并写回 detailH（展开与切换分类共用）
+   *
+   * 在 setData 回调里调用：此时节点已按新内容排版完毕，量出 `.detail` 的
+   * border-box 高度写回 detailH，容器 height 过渡自然从当前高度滑到新高度 ——
+   * 多记录分类切到少记录分类时，下方内容平滑跟随不跳变。
+   * 量不到（节点不存在）时保持 0，不影响下一次展开。
+   */
+  syncDetailHeight() {
+    wx.createSelectorQuery()
+      .select('.detail')
+      .boundingClientRect((rect) => {
+        const h = rect ? (rect as { height: number }).height : 0;
+        if (h > 0 && Math.abs(h - this.data.detailH) > 0.5) {
+          this.setData({ detailH: h });
+        }
+      })
+      .exec();
   },
 
   /**

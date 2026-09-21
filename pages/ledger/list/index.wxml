@@ -20,26 +20,21 @@
   <!--
     搜索行（折叠容器）：默认 height 0 收起，searchOpen 时展开到一个槽位高
     （height + 淡入 + 轻微下移回落，260ms 缓出，样式在 app.wxss）。
+    铺满对齐：van-search 根节点的左右内边距被 --search-padding 换成页面留白令牌，
+    搜索框圆角边缘正好与下方卡片对齐；没有「取消」按钮 —— 收起走导航栏图标再点，
+    或下滑浏览时自动收起（保留关键词，见 index.ts 的 collapseSearch）。
     搜索语义：限当前所选月份内，匹配备注 / 标签（防抖过滤列表，不动汇总数字）。
   -->
   <view class="search-fold {{ searchOpen ? 'search-fold--on' : '' }}">
-    <view class="search-fold__row">
-      <van-search
-        class="search-fold__input"
-        value="{{ keyword }}"
-        placeholder="搜索备注或标签"
-        shape="round"
-        focus="{{ searchOpen }}"
-        bind:change="onSearch"
-        background="transparent"
-      />
-      <view
-        class="search-fold__cancel"
-        hover-class="nav-act--hover"
-        hover-stay-time="60"
-        bindtap="closeSearch"
-      >取消</view>
-    </view>
+    <van-search
+      class="search-fold__input"
+      value="{{ keyword }}"
+      placeholder="搜索备注或标签"
+      shape="round"
+      focus="{{ searchOpen }}"
+      bind:change="onSearch"
+      background="transparent"
+    />
   </view>
 
   <view class="summary enter">

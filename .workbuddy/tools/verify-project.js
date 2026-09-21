@@ -61,20 +61,35 @@ const MARKERS = [
   // （height + 淡入，260ms 缓出），取消/再点收起并清词；搜索语义保持限当月（记账）与当前页签/标签（记事）。
   ['pages/ledger/list/index.wxml', 'slot="right"', '记账列表导航栏搜索图标（右侧插槽）'],
   ['pages/ledger/list/index.wxml', 'bindtap="onToggleSearch"', '记账列表搜索开合（调用点）'],
-  ['pages/ledger/list/index.wxml', 'bindtap="closeSearch"', '记账列表搜索取消（调用点）'],
   ['pages/ledger/list/index.wxml', 'search-fold--on', '记账列表搜索折叠展开态'],
   ['pages/ledger/list/index.ts', 'onToggleSearch() {', '记账列表搜索开合（方法）'],
   ['pages/ledger/list/index.ts', 'closeSearch() {', '记账列表搜索收起清词（方法）'],
   ['pages/ledger/list/index.ts', 'searchOpen: false,', '记账列表搜索开合状态字段'],
   ['pages/notes/list/index.wxml', 'slot="right"', '记事列表导航栏搜索图标（右侧插槽）'],
   ['pages/notes/list/index.wxml', 'bindtap="onToggleSearch"', '记事列表搜索开合（调用点）'],
-  ['pages/notes/list/index.wxml', 'bindtap="closeSearch"', '记事列表搜索取消（调用点）'],
   ['pages/notes/list/index.wxml', 'search-fold--on', '记事列表搜索折叠展开态'],
   ['pages/notes/list/index.ts', 'onToggleSearch() {', '记事列表搜索开合（方法）'],
   ['pages/notes/list/index.ts', 'closeSearch() {', '记事列表搜索收起清词（方法）'],
   ['pages/notes/list/index.ts', 'searchOpen: false,', '记事列表搜索开合状态字段'],
   ['app.wxss', '.search-fold {', '搜索折叠容器（两页共用）'],
   ['app.wxss', '.nav-search {', '导航栏搜索图标（右侧插槽内容）'],
+  // 搜索行铺满对齐 + 下滑自动收起（2026-09-21 第四轮）
+  ['app.wxss', '--search-padding: 0 var(--space-page);', '搜索框内边距换成页面留白令牌（铺满对齐下方卡片）'],
+  ['pages/ledger/list/index.ts', 'onSearchScrollHide(scrollTop: number) {', '记账列表下滑自动收起搜索行（方法）'],
+  ['pages/ledger/list/index.ts', 'this.onSearchScrollHide(e.scrollTop);', '记账列表滚动驱动搜索行收起（调用点）'],
+  ['pages/ledger/list/index.ts', 'collapseSearch() {', '记账列表滚动收起（保留关键词，方法）'],
+  ['pages/notes/list/index.ts', 'onSearchScrollHide(scrollTop: number) {', '记事列表下滑自动收起搜索行（方法）'],
+  ['pages/notes/list/index.ts', 'this.onSearchScrollHide(e.scrollTop);', '记事列表滚动驱动搜索行收起（调用点）'],
+  ['pages/notes/list/index.ts', 'collapseSearch() {', '记事列表滚动收起（保留关键词，方法）'],
+  // 导航栏标题绝对定位居中（右侧插槽放搜索图标后，flex 流内布局会把标题挤偏）
+  ['components/navigation-bar/navigation-bar.wxss', 'top: env(safe-area-inset-top);', '导航栏标题绝对定位居中（不随左右插槽宽度偏移）'],
+  ['components/navigation-bar/navigation-bar.wxss', 'pointer-events: none;', '标题层禁点击（否则全宽覆盖挡住右侧图标）'],
+  // 统计页分类明细：常驻折叠容器 + 实测高度过渡（切换分类不跳变）
+  ['pages/stats/index.wxml', 'detail-wrap', '统计明细折叠容器（height 过渡）'],
+  ['pages/stats/index.ts', 'syncDetailHeight() {', '明细高度实测写入（方法）'],
+  ['pages/stats/index.ts', 'collapseDetail() {', '明细收起走高度过渡（方法）'],
+  ['pages/stats/index.ts', 'detailTick: this.data.detailTick + 1,', '明细内容版本交替重播淡入'],
+  ['pages/stats/index.wxss', '.detail-wrap {', '统计明细容器样式（overflow hidden + height 过渡）'],
   // 挂载点（调用点）单独钉住：编排抽走后，页面必须还挂着 mixin 与可见 id 钩子
   ['pages/ledger/list/index.ts', 'defineSwipeSelectPage<LedgerRecord', '记账列表挂共享滑删编排'],
   ['pages/ledger/list/index.ts', 'visibleIds()', '记账列表可见 id 钩子'],
@@ -387,6 +402,14 @@ const FORBIDDEN = [
   // 谁把下面任何一种写法加回来，都会复现其中至少一个问题：
   ['pages/ledger/list/index.wxml', 'search-slot', '旧结构（.search-slot 绝对定位槽）已拆除，现用 .search-fold 折叠行'],
   ['pages/notes/list/index.wxml', 'search-slot', '旧结构（.search-slot 绝对定位槽）已拆除，现用 .search-fold 折叠行'],
+  // 「取消」按钮与 row 包裹层已移除（2026-09-21 第四轮）：搜索行铺满整行与下方卡片对齐，
+  // 收起走导航栏图标再点 / 下滑自动收起（collapseSearch 保留关键词）
+  ['pages/ledger/list/index.wxml', 'search-fold__cancel', '搜索行不再带「取消」按钮（铺满对齐）'],
+  ['pages/notes/list/index.wxml', 'search-fold__cancel', '搜索行不再带「取消」按钮（铺满对齐）'],
+  ['pages/ledger/list/index.wxml', 'search-fold__row', '搜索行不再包一层 row（van-search 直接铺满）'],
+  ['pages/notes/list/index.wxml', 'search-fold__row', '搜索行不再包一层 row（van-search 直接铺满）'],
+  // 统计明细不许退回 wx:if 卸载式显隐：切换分类时整块消失重现、高度跳变（用户报的"割裂感"）
+  ['pages/stats/index.wxml', 'class="detail" wx:if', '统计明细不再用 wx:if 卸载（改折叠容器高度过渡）'],
   ['pages/ledger/list/index.wxml', 'searchPullStyle', '跟手位移容器已拆除（纯点按不需要位移）'],
   ['pages/notes/list/index.wxml', 'searchPullStyle', '跟手位移容器已拆除（纯点按不需要位移）'],
   ['pages/ledger/list/index.wxml', 'capture-bind:touchmove="onSearchTouchMove"', '贴顶下拉触摸手势已拆除（开合靠点按）'],

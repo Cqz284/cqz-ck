@@ -19,6 +19,9 @@ const FILTERS: NotesFilter[] = ['all', NoteKind.Todo, NoteKind.Plain];
 /** 搜索防抖等待时长（毫秒） */
 const SEARCH_WAIT = 300;
 
+/** 下滑自动收起搜索行的位移阈值（px）：一次明确的向下滚动才收，轻微抖动 / 回弹不打扰 */
+const SEARCH_SCROLL_HIDE_PX = 24;
+
 /** 页面 data（滑动多选部分由 behaviors/swipe-select 提供） */
 interface NotesListData extends SwipeSelectData {
   items: NoteItem[];
@@ -52,6 +55,8 @@ interface NotesListData extends SwipeSelectData {
 interface NotesListCustom extends SwipeSelectMethods {
   /** store 绑定实例（onUnload 时销毁） */
   bindings: StoreBindings[];
+  /** 上一次的 scrollTop（px；-1 = 尚未滚过，滚动收起搜索行用） */
+  searchLastTop: number;
   /** 防抖后的搜索提交（onUnload 时取消） */
   commitSearch: DebouncedFn<(kw: string) => void>;
   refresh(extra?: Partial<NotesListData>): void;
@@ -64,8 +69,12 @@ interface NotesListCustom extends SwipeSelectMethods {
   onSearch(e: { detail: string | { value?: string } }): void;
   /** 搜索开合（导航栏右侧图标）：展开输入行；已展开时再点 = 收起并清词 */
   onToggleSearch(): void;
-  /** 收起搜索行并清空关键词（「取消」与再次点图标共用） */
+  /** 收起搜索行并清空关键词（再次点导航栏图标；搜索行不可见时过滤不应悄悄生效） */
   closeSearch(): void;
+  /** 只收起输入行、保留关键词（下滑浏览搜索结果时自动收，过滤继续生效） */
+  collapseSearch(): void;
+  /** 页面滚动驱动的自动收起（onPageScroll 调用）：向下滚过阈值才收 */
+  onSearchScrollHide(scrollTop: number): void;
   setFilter(e: { detail: { index: number } }): void;
   /** 点标签胶囊：再点一次取消（回到全部） */
   onTagFilter(e: { currentTarget: { dataset: { tag: string } } }): void;
@@ -98,6 +107,8 @@ Page<NotesListData, NotesListCustom>(
     {
       /** store 绑定实例（onLoad 中填充，onUnload 中销毁） */
       bindings: [] as StoreBindings[],
+      /** 上一次的 scrollTop（px；-1 = 尚未滚过，首次滚动不做方向判定） */
+      searchLastTop: -1,
       /** 防抖后的搜索提交（onLoad 中重建，onUnload 中取消） */
       commitSearch: debounce((_kw: string) => {}, SEARCH_WAIT),
 
@@ -186,9 +197,12 @@ Page<NotesListData, NotesListCustom>(
         this.clearExitTimer();
       },
 
-      /** 页面滚动：收回滑开的行（列表滚起来，露出的删除/多选块就该收回去） */
+      /**
+       * 页面滚动：收回滑开的行；搜索行展开时向下滚过阈值自动收起（保留关键词）
+       */
       onPageScroll(e: { scrollTop: number }) {
         this.closeSwipesOnScroll();
+        this.onSearchScrollHide(e.scrollTop);
       },
 
       /**
@@ -252,7 +266,7 @@ Page<NotesListData, NotesListCustom>(
         this.setData({ searchOpen: true });
       },
 
-      /** 收起搜索行并清空关键词（搜索行不可见时，过滤不应还悄悄生效） */
+      /** 收起搜索行并清空关键词（再次点导航栏图标；搜索行不可见时，过滤不应还悄悄生效） */
       closeSearch() {
         if (!this.data.searchOpen) return;
         // 作废未执行的防抖，否则关掉后它还会把关键词写回 store
@@ -261,6 +275,25 @@ Page<NotesListData, NotesListCustom>(
         this.setData({ searchOpen: false, keyword: '' });
         this.refresh();
         this.resetPick();
+      },
+
+      /** 只收起输入行、保留关键词：下滑浏览搜索结果时自动收起，列表过滤继续生效 */
+      collapseSearch() {
+        if (!this.data.searchOpen) return;
+        this.setData({ searchOpen: false });
+      },
+
+      /**
+       * 滚动驱动的搜索行收起
+       * 只认"明确的向下滚动"（一次位移超过 SEARCH_SCROLL_HIDE_PX），
+       * 轻微抖动 / iOS 回弹不打扰；向上滚动不收（用户可能想回去改词）。
+       * 防抖中的关键词不作废：收起后它照常落 store，过滤结果与输入框保持一致。
+       */
+      onSearchScrollHide(scrollTop: number) {
+        const prev = this.searchLastTop;
+        this.searchLastTop = scrollTop;
+        if (!this.data.searchOpen) return;
+        if (prev >= 0 && scrollTop - prev > SEARCH_SCROLL_HIDE_PX) this.collapseSearch();
       },
 
       /**

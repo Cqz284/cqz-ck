@@ -28,6 +28,9 @@ interface DayGroupView extends LedgerDayGroup {
 /** 搜索防抖等待时长（毫秒），与记事页同口径 */
 const SEARCH_WAIT = 300;
 
+/** 下滑自动收起搜索行的位移阈值（px）：一次明确的向下滚动才收，轻微抖动 / 回弹不打扰 */
+const SEARCH_SCROLL_HIDE_PX = 24;
+
 /** 页面 data（滑动多选部分由 behaviors/swipe-select 提供） */
 interface LedgerListData extends SwipeSelectData {
   groups: DayGroupView[];
@@ -75,6 +78,8 @@ interface LedgerListData extends SwipeSelectData {
 interface LedgerListCustom extends SwipeSelectMethods {
   /** 结余滚动器（onLoad 创建，onUnload 取消） */
   roller: BalanceRoller | null;
+  /** 上一次的 scrollTop（px；-1 = 尚未滚过，滚动收起搜索行用） */
+  searchLastTop: number;
   /** 防抖后的搜索提交（onLoad 中重建，onUnload 中取消） */
   commitSearch: DebouncedFn<(kw: string) => void>;
   refresh(extra?: Partial<LedgerListData>): void;
@@ -93,8 +98,12 @@ interface LedgerListCustom extends SwipeSelectMethods {
   onSearch(e: { detail: string | { value?: string } }): void;
   /** 搜索开合（导航栏右侧图标）：展开输入行；已展开时再点 = 收起并清词 */
   onToggleSearch(): void;
-  /** 收起搜索行并清空关键词（「取消」与再次点图标共用） */
+  /** 收起搜索行并清空关键词（再次点导航栏图标；搜索行不可见时过滤不应悄悄生效） */
   closeSearch(): void;
+  /** 只收起输入行、保留关键词（下滑浏览搜索结果时自动收，过滤继续生效） */
+  collapseSearch(): void;
+  /** 页面滚动驱动的自动收起（onPageScroll 调用）：向下滚过阈值才收 */
+  onSearchScrollHide(scrollTop: number): void;
   /**
    * 只清空选中、保留多选模式
    * 用于月份/搜索变化：列表内容变了，旧的勾选要么看不见、要么语义错位，直接重置最不容易出错
@@ -130,6 +139,8 @@ Page<LedgerListData, LedgerListCustom>(
     {
       /** 结余滚动器（onLoad 创建） */
       roller: null,
+      /** 上一次的 scrollTop（px；-1 = 尚未滚过，首次滚动不做方向判定） */
+      searchLastTop: -1,
       /** 防抖后的搜索提交（onLoad 中重建，onUnload 中取消） */
       commitSearch: debounce((_kw: string) => {}, SEARCH_WAIT),
 
@@ -215,9 +226,12 @@ Page<LedgerListData, LedgerListCustom>(
         this.clearExitTimer();
       },
 
-      /** 页面滚动：收回滑开的行（列表滚起来，露出的删除/多选块就该收回去） */
+      /**
+       * 页面滚动：收回滑开的行；搜索行展开时向下滚过阈值自动收起（保留关键词）
+       */
       onPageScroll(e: { scrollTop: number }) {
         this.closeSwipesOnScroll();
+        this.onSearchScrollHide(e.scrollTop);
       },
 
       /**
@@ -352,7 +366,7 @@ Page<LedgerListData, LedgerListCustom>(
         this.setData({ searchOpen: true });
       },
 
-      /** 收起搜索行并清空关键词（搜索行不可见时，过滤不应还悄悄生效） */
+      /** 收起搜索行并清空关键词（再次点导航栏图标；搜索行不可见时，过滤不应还悄悄生效） */
       closeSearch() {
         if (!this.data.searchOpen) return;
         // 作废未执行的防抖，否则关掉后它还会把关键词写回来
@@ -360,6 +374,25 @@ Page<LedgerListData, LedgerListCustom>(
         this.setData({ searchOpen: false, keyword: '' });
         this.refresh();
         this.resetPick();
+      },
+
+      /** 只收起输入行、保留关键词：下滑浏览搜索结果时自动收起，列表过滤继续生效 */
+      collapseSearch() {
+        if (!this.data.searchOpen) return;
+        this.setData({ searchOpen: false });
+      },
+
+      /**
+       * 滚动驱动的搜索行收起
+       * 只认"明确的向下滚动"（一次位移超过 SEARCH_SCROLL_HIDE_PX），
+       * 轻微抖动 / iOS 回弹不打扰；向上滚动不收（用户可能想回去改词）。
+       * 防抖中的关键词不作废：收起后它照常落库，过滤结果与输入框保持一致。
+       */
+      onSearchScrollHide(scrollTop: number) {
+        const prev = this.searchLastTop;
+        this.searchLastTop = scrollTop;
+        if (!this.data.searchOpen) return;
+        if (prev >= 0 && scrollTop - prev > SEARCH_SCROLL_HIDE_PX) this.collapseSearch();
       },
 
       /** 只清空选中、保留多选模式（月份/搜索变化时用） */

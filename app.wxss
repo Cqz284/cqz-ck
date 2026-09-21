@@ -308,6 +308,11 @@ page {
    展开 = height 撑开 + 淡入 + 轻微下移回落，260ms 缓出，与项目其他过渡同语言。
    没有手势、没有位移，开合由 data.searchOpen 一个布尔驱动 —— 可靠性不再依赖手势判定。 */
 .search-fold {
+  /* 铺满对齐：把 van-search 根节点的左右内边距换成页面留白令牌
+     （CSS 变量可穿透组件继承，无需碰组件内部），搜索框圆角边缘正好与下方卡片对齐。
+     「取消」按钮已移除：收起走导航栏图标再点，或下滑浏览时自动收起
+     （两列表页 index.ts 的 collapseSearch，保留关键词）。 */
+  --search-padding: 0 var(--space-page);
   height: 0;
   opacity: 0;
   overflow: hidden;
@@ -322,24 +327,10 @@ page {
   transform: translateY(0);
 }
 
-.search-fold__row {
-  display: flex;
-  align-items: center;
-  padding: 0 var(--space-page);
-}
-
+/* van-search 宿主节点：块级铺满整行（内边距由上面的 --search-padding 交给组件内部） */
 .search-fold__input {
-  flex: 1;
-  min-width: 0;
-}
-
-/* 「取消」：主色文字按钮（收起并清空关键词，见两页 index.ts 的 closeSearch） */
-.search-fold__cancel {
-  flex-shrink: 0;
-  padding: 12rpx 0 12rpx 20rpx;
-  font-size: var(--font-sub);
-  color: var(--primary);
-  transition: opacity 0.16s ease;
+  display: block;
+  width: 100%;
 }
 
 /* ===== 导航栏右侧搜索图标（两列表页的 slot="right" 内容）=====

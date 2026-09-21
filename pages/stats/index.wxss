@@ -209,18 +209,47 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* ===== 分类明细（点分类后展开） ===== */
-.detail {
+/* ===== 分类明细（点分类后展开：常驻折叠容器 + 实测高度过渡） =====
+   容器永远挂在文档里，高度由 JS 实测写入（detailH，见 stats/index.ts 的
+   syncDetailHeight）：展开 = 0→内容高、切换分类 = 旧内容高→新内容高、
+   收起 = →0 —— 三个方向走同一条 height 过渡，多记录分类切到少记录分类时
+   下方内容平滑跟随，不再出现"整块消失重现"的割裂感。
+   ⚠️ 内层 .detail 不能带外边距：实测的是它的 border-box 高度，外边距会让容器
+   高度差一个 margin、底部被裁掉一条 —— 边距全部挂在 .detail-wrap 上。 */
+.detail-wrap {
   margin: 24rpx var(--space-page) 0;
+  overflow: hidden;
+  transition: height 0.32s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.22s ease;
+}
+
+/* 收起中（高度 → 0）整块淡出：内容被裁切线收掉的同时透明度跟着走，不生硬 */
+.detail-wrap--closed {
+  opacity: 0;
+}
+
+.detail {
   padding: var(--space-card);
   background: var(--card-bg);
   border-radius: var(--radius-card);
   box-shadow: var(--shadow-card);
-  /* 整块淡入：与分类高亮呼应，给用户"这里展开了明细"的反馈 */
-  animation: detail-in 0.34s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-@keyframes detail-in {
+/* 内容过渡：奇偶交替的两个 class 引用不同 keyframes ——
+   同名动画换 class 不会重播，交替命名才能在每次切换分类时强制重播淡入 */
+.detail--t0 {
+  animation: detail-in-a 0.34s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.detail--t1 {
+  animation: detail-in-b 0.34s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes detail-in-a {
+  from { opacity: 0; transform: translateY(14rpx); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes detail-in-b {
   from { opacity: 0; transform: translateY(14rpx); }
   to { opacity: 1; transform: translateY(0); }
 }
