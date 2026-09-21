@@ -88,10 +88,12 @@ const MARKERS = [
   ['pages/ledger/list/index.wxml', 'bind:blur="onSearchBlur"', '记账列表搜索失焦自动收起（调用点）'],
   ['pages/ledger/list/index.ts', 'onSearchBlur(e: { detail?: string | { value?: string } }) {', '记账列表搜索失焦收起（方法）'],
   ['pages/ledger/list/index.ts', 'if (String(raw).trim() || this.data.keyword.trim()) return;', '记账列表失焦收起仅限空输入（有内容不收）'],
+  ['pages/ledger/list/index.ts', 'if (this.data.keyword.trim()) return;', '记账列表滚动收起仅限空输入（有内容不收，与失焦同口径）'],
   ['pages/ledger/list/index.ts', 'clearSearchBlurHide() {', '记账列表失焦收起作废（防点图标竞争）'],
   ['pages/notes/list/index.wxml', 'bind:blur="onSearchBlur"', '记事列表搜索失焦自动收起（调用点）'],
   ['pages/notes/list/index.ts', 'onSearchBlur(e: { detail?: string | { value?: string } }) {', '记事列表搜索失焦收起（方法）'],
   ['pages/notes/list/index.ts', 'if (String(raw).trim() || this.data.keyword.trim()) return;', '记事列表失焦收起仅限空输入（有内容不收）'],
+  ['pages/notes/list/index.ts', 'if (this.data.keyword.trim()) return;', '记事列表滚动收起仅限空输入（有内容不收，与失焦同口径）'],
   ['pages/notes/list/index.ts', 'clearSearchBlurHide() {', '记事列表失焦收起作废（防点图标竞争）'],
   // 导航栏标题绝对定位居中（右侧插槽放搜索图标后，flex 流内布局会把标题挤偏）
   ['components/navigation-bar/navigation-bar.wxss', 'bottom: 0;\n  height: var(--height);', '导航栏标题绝对定位居中且贴底（不随左右插槽宽度偏移，也不吃状态栏高度的亏）'],

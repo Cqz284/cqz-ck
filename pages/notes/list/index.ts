@@ -306,6 +306,8 @@ Page<NotesListData, NotesListCustom>(
 
       /**
        * 滚动驱动的搜索行收起
+       * 口径与失焦收起一致：**只在输入框为空时收** —— 有关键词时用户在浏览结果，
+       * 收掉输入行反而打断（想收再点导航栏图标，连词清掉）。
        * 只认"明确的向下滚动"（一次位移超过 SEARCH_SCROLL_HIDE_PX），
        * 轻微抖动 / iOS 回弹不打扰；向上滚动不收（用户可能想回去改词）。
        * 防抖中的关键词不作废：收起后它照常落 store，过滤结果与输入框保持一致。
@@ -314,6 +316,7 @@ Page<NotesListData, NotesListCustom>(
         const prev = this.searchLastTop;
         this.searchLastTop = scrollTop;
         if (!this.data.searchOpen) return;
+        if (this.data.keyword.trim()) return;
         if (prev >= 0 && scrollTop - prev > SEARCH_SCROLL_HIDE_PX) this.collapseSearch();
       },
 
