@@ -89,23 +89,46 @@
 - 多选态行首 `.pick--in` 占 72rpx，卡片内边距要收窄（`.row-inner--picking`，不用 `:has()`），
   别缩勾选圈本身；记账页 ledger-card 无自带勾选圈，别顺手改
 
-## 顶部搜索「导航栏图标 + 折叠输入行」（2026-09-21 第三轮定稿，详见技能第 7.4 节）
+## 顶部搜索「导航栏图标 + 折叠输入行」（2026-09-21 第四轮定稿，详见技能第 7.4 节）
 - **下拉跟手方案已整体废弃**：三轮迭代（阈值弹出 → 跟手吸附 → 几何修复）后 bug 不断，用户拍板
   「搜索栏不做了，换成其他形式」。`utils/search-reveal.ts`、`behaviors/search-reveal.ts`、
   `.pull` 位移容器、页面根 capture-bind 触摸四件套、swipe-select 的 `hideSearchIfShown` 钩子
   **全部删净**（verify 已登记禁止回归，谁加回来就复现三轮 bug 史）
 - 现方案（纯点按，两页统一）：**导航栏右侧插槽**（`navigation-bar` 本就开了 multipleSlots，
   `<slot name="right">` 一直在、落在胶囊左侧标准工具区）放 `van-icon name="search"` 放大镜
-  （颜色由模板按 `navBarColor` 传）；点开在导航栏下方展开一行输入框，取消/再点收起并清词
+  （颜色由模板按 `navBarColor` 传）；点开在导航栏下方展开一行输入框，再点图标收起并清词
 - 折叠容器 `.search-fold`（app.wxss）：`height 0 ↔ var(--search-slot-h, 96rpx)` + 淡入 +
   `translateY(-8rpx)→0`，260ms 缓出；收起态**必须 overflow: hidden**；`data.searchOpen`
   一个布尔驱动，无手势无位移；`focus="{{ searchOpen }}"` 展开即自动聚焦
-- `closeSearch()` 收起时**必须先 `commitSearch.cancel()`** 再清词刷新（否则防抖还会把关键词写回来）；
-  搜索行不可见时过滤不应悄悄生效 → 收起即清词。搜索语义不变：限当月（记账）、跟随页签/标签（记事）
-- `onPageScroll` 回归只做 `closeSwipesOnScroll()` 一件事
+- **铺满对齐（第四轮）**：没有「取消」按钮、没有 row 包裹层，van-search 直接铺满整行；
+  根节点的左右内边距靠 `--search-padding: 0 var(--space-page)` 穿透组件继承换成页面留白令牌，
+  搜索框圆角边缘正好与下方卡片对齐
+- **下滑自动收起（第四轮）**：`onPageScroll` → `onSearchScrollHide(e.scrollTop)`（两页同款），
+  向下滚一次位移 > `SEARCH_SCROLL_HIDE_PX`(24px) 才收（轻微抖动/回弹不打扰，向上滚不收）；
+  **`collapseSearch()` 只收输入行、保留关键词**——结果还在下面，清词会让列表跳回全部；
+  防抖不作废（收起后照常落库，输入框与过滤一致）。实例字段 `searchLastTop`（-1=未滚过）
+  必须登记进页面 Custom 接口（defineSwipeSelectPage 选项类型封闭）
+- `closeSearch()`（图标再点）收起时**必须先 `commitSearch.cancel()`** 再清词刷新
+  （否则防抖还会把关键词写回来）。搜索语义不变：限当月（记账）、跟随页签/标签（记事）
 - 经验教训：**给低频功能配复杂手势（下拉跟手/吸附）性价比极低**——动效要求越高、失败面越大；
   入口类功能优先用「点按入口 + 简单过渡」。另外 `navigation-bar` 有现成 right slot，别再重造
+- **导航栏标题居中（第四轮）**：`__center` 改绝对定位（left/right 0 + 上下 env(safe-area-inset-top)）
+  —— 左侧 leftWidth 内联固定宽 vs 右侧插槽图标不对称，flex 流内 `flex:1` 会被挤偏；
+  ⚠️ `__center` 必须加 `pointer-events: none`（全宽覆盖会挡住 right 插槽图标点击），
+  `__right` 要 `flex:1 + justify-content: flex-end`（center 脱流后 right 不撑开会挤在中间）
 - 回退点（历史方案仅存 git）：跟手版 `d0eddf7`；「阈值弹出/高度撑开」版基线 `8732595`
+
+## 统计页分类明细「折叠容器高度过渡」（2026-09-21 第四轮）
+- **不许退回 `wx:if` 卸载式显隐**：切分类时整块消失重现、高度跳变（用户报的"割裂感"），
+  verify 已登记禁止回归
+- 结构：常驻 `.detail-wrap`（`wx:if="{{ hasData }}"` + 内联 `height: {{detailH}}px`，
+  overflow hidden + height/opacity 过渡）→ 内层 `.detail detail--t{{detailTick % 2}}`
+- `detailH` 由 `syncDetailHeight()` 在 setData 回调里**实测** `.detail` 的 border-box 高度写入
+  （展开 0→h、切换 旧h→新h、收起 →0 三个方向同一条过渡）；⚠️ 外边距全部挂 wrap 上、
+  内层不能带 margin（实测的是 border-box，带 margin 底部会被裁掉一条）
+- 内容淡入靠 `detailTick+1` 奇偶交替 `detail--t0/t1`（引用**不同名** keyframes，同名动画换
+  class 不重播）；`detail-wrap--closed`（detailH===0）收起时整块淡出
+- `collapseDetail()` 收起不清内容（留在容器里被裁掉），refresh() 重置时直接 detailH:0
 
 ## 备份恢复
 - 唯一实现在 utils/backup.ts，导入逐条清洗；合并=id 去重补入+标签仅未自定义时导入+设置不动；
