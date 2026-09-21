@@ -89,26 +89,40 @@
 - 多选态行首 `.pick--in` 占 72rpx，卡片内边距要收窄（`.row-inner--picking`，不用 `:has()`），
   别缩勾选圈本身；记账页 ledger-card 无自带勾选圈，别顺手改
 
-## 顶部搜索栏「下拉露出」（2026-09-21 定稿，详见技能第 7.4 节）
-- 两个列表页搜索栏默认收起（`.search-slot` 高度 0）：**下拉露出、往下翻或空闲 5s 收回**；
-  有输入 / 聚焦中不收；多选态一律收起（swipe-select 的 `enterSelect` 调可选钩子 `hideSearchIfShown?.()`）
-- 驱动有**两路，各管一段**（缺一路就出"进页直接下拉没反应、得先上滑再拉"）：
-  ① `onPageScroll(e)`：`closeSwipesOnScroll()` + `onPageScrollSearch(e.scrollTop)`（中部方向判定，
-  仅 scrollTop ≤ 150px 时露出——中部上滑撑开会把下方内容整体下移 48px，叠在手指位移上像"内容自己跳"）；
-  ② 页面根挂 `capture-bind:touchstart/touchmove/touchend/touchcancel`（**贴顶补位**：页面已在顶部时
-  scrollTop 恒为 0、小程序拿不到负值，"到顶后继续拖"没有事件 → 方向判定永远 none）
-- ⚠️ 贴顶那一路**必须 capture-bind**：van-swipe-cell 有 `catchtouchmove`（拖动中阻断冒泡），换 `bind`
+## 顶部搜索栏「跟手下拉 + 松手吸附」（2026-09-21 第二轮定稿，详见技能第 7.4 节）
+- 位移模型：搜索栏**绝对定位在 `.pull` 上方一个槽位高**处，`.pull`（包住搜索栏与全部内容）
+  用内联 `transform: translate3d(0, Npx, 0)` 把它带进视口 —— 手指下拉多少就下移多少（1:1），
+  观感是"搜索框从上方滑入、内容整体下移"，而不是"高度从 0 撑开"（后者把搜索框压扁着展开）
+  ⚠️ `.pull` 的 transform 会给后代创建包含块，页面里不能有依赖它定位的 `position: fixed` 元素
+  （fab / 多选操作条 / 撤销条都在 `.page` 之外，安全）
+- **位移与 transition 必须拼进同一次 setData**（`pullStyleOf`）：跟手期间 `transition: none`，
+  松手换成吸附曲线；拆成两个字段会让"关过渡"与"改位移"落不同帧 → 跟手第一段被曲线吃掉、慢半拍。
+  `applyPullOffset(offset, shown)` 是位移/展开态的**唯一出口**，并顺带丢弃未完成的手势
+- 手感参数（utils/search-reveal.ts 顶部）：激活死区 `PULL_ACTIVATE_PX=6`（横向滑删的纵向漂移不误抖，
+  越过后仍严格 1:1）、阻尼 `PULL_OVERSHOOT_DAMPING=0.35` 且封顶 `PULL_MAX_RATIO=1.6`、
+  吸附门槛 `PULL_SNAP_RATIO=0.4` / 速度 `PULL_SNAP_VELOCITY=0.3`（速度优先于距离）、
+  吸附曲线 `PULL_SETTLE_EASING` 的 y>1 制造轻微过冲 ＝ iOS 橡皮筋感
+- 收起口径不变：往下翻或空闲 5s 收回；有输入 / 聚焦中不收；多选态一律收起
+  （swipe-select 的 `enterSelect` 调可选钩子 `hideSearchIfShown?.()`）
+- 驱动仍有两路，各管一段（缺一路就出"进页直接下拉没反应、得先上滑再拉"）：
+  ① `onPageScroll(e)` → `closeSwipesOnScroll()` + `onPageScrollSearch(e.scrollTop)`（中部方向判定，
+  仅 scrollTop ≤ 150px 时露出——中部上滑撑开会把下方内容整体下移，叠在手指位移上像"内容自己跳"）；
+  ② 页面根挂 `capture-bind:touchstart/touchmove/touchend/touchcancel`（贴顶跟手那一路）
+- ⚠️ 触摸那一路**必须 capture-bind**：van-swipe-cell 有 `catchtouchmove`（拖动中阻断冒泡），换 `bind`
   就收不到"手指落在卡片上"的 move，而贴顶下拉恰好全落在卡片上。`top` 要在 touchmove 里**现读**
-  `searchLastTop`（不能用 touchstart 快照，中部拉回顶部时手指还没松）；判定成功即清 `searchTouchY`
-  （一次手势只露一次）；已露出/多选态 touchstart 直接不记起点
+  `searchLastTop`（不能用 touchstart 快照：中部拉回顶部时手指还没松）；接管判定惰性放在 touchmove
+  （要接"从中部一路拉回顶部"的手势，dy 只从贴顶那一帧起算，位移才不会突变）
+- `onSearchTouchEnd` 的**回弹一支不走 `hideSearch`**：会被"正在使用/不可滚动"拦下 → 位移卡在半路。
+  唯一例外：`searchUnscrollable` 时回弹成露出（也是常驻栏被多选态藏起来后唯一能找回的路径）
 - **不用 enablePullDownRefresh**（会带微信原生转圈，且整页下移回弹 + 搜索栏撑开是双重位移）
 - 槽位高度用确定值：app.wxss 的 `--search-slot-h` ↔ `utils/search-reveal.ts` 的 `SEARCH_SLOT_HEIGHT_RPX`
-  必须同步（JS 要用它判断"内容能不能滚动"）
+  必须同步（JS 要用它判断"内容能不能滚动"与"拉出量过没过吸附门槛"）
 - **内容短到不能滚动时搜索栏常驻**（否则用户永远做不出"下拉"这个动作）：`checkSearchRevealFit()` 在
   refresh 末尾调用；比较时**减掉搜索栏自身占位**（否则"撑开→能滚动→收起→又不能滚动"振荡），另有 24px 余量
 - 编排接入方式：页面选项里 `...searchRevealMixin`（带 ThisType 的对象字面量），页面 Custom 接口 extends
   `SearchRevealFields, SearchRevealMethods`。**别用 Object.assign**（丢 this 类型），也不必改
   defineSwipeSelectPage 签名
+- 回退点：跟手版 `d0eddf7`；旧「阈值弹出 / 高度撑开」版基线 `8732595`
 
 ## 备份恢复
 - 唯一实现在 utils/backup.ts，导入逐条清洗；合并=id 去重补入+标签仅未自定义时导入+设置不动；
