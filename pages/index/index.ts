@@ -95,6 +95,8 @@ interface HomeCustom {
   goAddNote(): void;
   goLedgerList(): void;
   goNotesList(): void;
+  goStats(): void;
+  goTodos(): void;
   goSettings(): void;
   onEditRecord(e: { detail: { id: string } }): void;
   onEditNote(e: { detail: { id: string } }): void;
@@ -278,6 +280,19 @@ Page<HomeData, HomeCustom>({
   /** 查看全部记事 */
   goNotesList() {
     haptic('light');
+    wx.switchTab({ url: '/pages/notes/list/index' });
+  },
+
+  /** 分类统计 */
+  goStats() {
+    haptic('light');
+    wx.navigateTo({ url: '/pages/stats/index' });
+  },
+
+  /** 待办清单：切到记事页并落在「待办」页签（switchTab 不能带参，走 store 的一次性落点意图） */
+  goTodos() {
+    haptic('light');
+    notesStore.setPendingTab(1);
     wx.switchTab({ url: '/pages/notes/list/index' });
   },
 

@@ -2,9 +2,48 @@
 <!-- 多选入口不再占用导航栏：右滑单条记录即进入多选，多选态下左滑即退出（见下方左/右槽位） -->
 <navigation-bar title="记账" back="{{false}}" color="{{navBarColor}}" background="{{navBarBg}}"></navigation-bar>
 
-<view class="page" style="{{pageStyle}}">
+<view
+  class="page"
+  style="{{pageStyle}}"
+  capture-bind:touchstart="onSearchTouchStart"
+  capture-bind:touchmove="onSearchTouchMove"
+  capture-bind:touchend="onSearchTouchEnd"
+  capture-bind:touchcancel="onSearchTouchEnd"
+>
+  <!--
+    搜索：限当前所选月份内，匹配备注 / 标签（防抖过滤列表，不动汇总数字）。
+    平时收在 .search-slot 里（高度 0，不占位也不可点）：下拉页面才露出，
+    往下翻或露出后久不操作自动收回 —— 编排在 behaviors/search-reveal.ts，样式在 app.wxss。
+  -->
+  <view class="search-slot {{ searchShown ? 'search-slot--on' : '' }}">
+    <van-search
+      value="{{ keyword }}"
+      placeholder="搜索备注或标签"
+      shape="round"
+      bind:change="onSearch"
+      bind:focus="onSearchFocus"
+      bind:blur="onSearchBlur"
+      background="{{pageBg}}"
+    />
+  </view>
   <view class="summary enter">
-    <text class="summary__label">本月结余</text>
+    <!-- 月份切换：‹ › 逐月翻，中间点一下弹年月选择器直达（封顶当前月，与统计页同款交互） -->
+    <view class="summary__month">
+      <view class="month-nav" hover-class="month-nav--hover" hover-stay-time="60" bindtap="onPrevMonth">‹</view>
+      <picker mode="date" fields="month" value="{{ month }}" end="{{ maxMonth }}" bindchange="onPickMonth">
+        <view class="month-pill" hover-class="month-pill--hover" hover-stay-time="60">
+          <text class="month-pill__label">{{ monthText }}</text>
+          <view class="month-pill__caret"><van-icon name="arrow-down" size="20rpx" /></view>
+        </view>
+      </picker>
+      <view
+        class="month-nav {{ canNext ? '' : 'month-nav--off' }}"
+        hover-class="month-nav--hover"
+        hover-stay-time="60"
+        bindtap="onNextMonth"
+      >›</view>
+    </view>
+    <text class="summary__label">{{ summaryLabel }}</text>
     <text class="summary__balance amount {{ balanceClass }}">{{ balanceText }}</text>
     <view class="summary__row">
       <view class="summary__col">
@@ -16,10 +55,10 @@
         <text class="summary__v amount--expense">{{ expenseText }}</text>
       </view>
     </view>
-    <!-- 分类占比：与首页同一张卡、同一条口径，点详情进完整环形图（无支出时整块不占位） -->
+    <!-- 分类占比：与首页同一张卡、同一条口径（跟随所选月份），点详情进完整环形图（无支出时整块不占位） -->
     <view class="summary__mix" wx:if="{{ mixItems.length }}">
       <mix-bar
-        title="本月支出构成"
+        title="{{ mixTitle }}"
         total-text="{{ mixTotalText }}"
         items="{{ mixItems }}"
         bind:open="goStats"
@@ -133,14 +172,22 @@
     </view>
   </view>
 
+  <!-- 两种空态：该月没记账（带行动入口）/ 搜索无结果（纯提示） -->
   <empty-state
-    wx:if="{{ groups.length === 0 }}"
+    wx:if="{{ groups.length === 0 && monthEmpty }}"
     class="enter"
     style="animation-delay: 120ms"
     icon="balance-o"
-    text="还没有记录，记下第一笔吧"
+    text="{{ monthText }}还没有记录，记下第一笔吧"
     action-text="记一笔"
     bind:action="goEdit"
+  />
+  <empty-state
+    wx:elif="{{ groups.length === 0 }}"
+    class="enter"
+    style="animation-delay: 120ms"
+    icon="search"
+    text="没有匹配的记录"
   />
 </view>
 

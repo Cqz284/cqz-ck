@@ -97,6 +97,11 @@ export interface NoteItem {
    * 0 / undefined = 未设置。允许是过去的时间（设了就已逾期是合理状态）
    */
   dueTime?: number
+  /**
+   * 标签集合；可选，空 = 无标签（持久化结构里不落空数组，语义与 dueTime 的"清除"一致）。
+   * 笔记与待办都可以打标签，单条最多 10 个、每个最长 20 字（见 NotesService）
+   */
+  tags?: string[]
   /** 创建时间戳（毫秒） */
   createTime: number
   /** 更新时间戳（毫秒） */
@@ -115,6 +120,8 @@ export interface NoteInput {
   done?: boolean
   /** 截止时间戳（毫秒），仅待办有效；0 表示清除 */
   dueTime?: number
+  /** 标签集合；不传保持原值，传空数组 = 清除全部标签 */
+  tags?: string[]
 }
 
 /** 记事查询条件 */
@@ -123,7 +130,7 @@ export interface NoteQueryOptions {
   kind?: NoteKind
   /** 完成状态过滤 */
   done?: boolean
-  /** 关键词，匹配内容 */
+  /** 关键词，匹配内容与标签 */
   keyword?: string
 }
 

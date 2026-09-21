@@ -43,20 +43,49 @@ const MARKERS = [
   ['behaviors/swipe-select.ts', 'openSideMap', '滑开侧记录（共享）'],
   ['behaviors/swipe-select.ts', 'exitMap', '退出中性色块（共享）'],
   ['behaviors/swipe-select.ts', 'collapseRemove(ids: string[], done: () => void)', '删除收起动画编排（共享）'],
-  // 跨页残留的滑开态（2026-09-20 定位到真因）：
-  // close() 依赖实例查找、查不到会静默失败；而"宽度归零一帧再还原"的写法会让
-  // Vant 的 swipeMove(0) 被宽度 observer 的 swipeMove(newWidth) 覆盖（两次 setData 同批），
-  // 行反而停在半开位。现在整页收口是**终止型**（只归零、不还原），恢复靠下一帧的 restoreSwipeWidth()
-  ['behaviors/swipe-select.ts', 'resetSwipes() {', '强制收回（数据驱动，不依赖实例查找）'],
-  ['behaviors/swipe-select.ts', 'patch.swipeReset = true', '强制收回：两槽宽度归零（终止型，不还原）'],
-  ['behaviors/swipe-select.ts', 'restoreSwipeWidth() {', '整页收口的宽度还原（页面显示后首帧调用）'],
-  ['behaviors/swipe-select.ts', 'if (!self.data.swipeReset) return;', 'restoreSwipeWidth 幂等（没归零就不动）'],
-  ['behaviors/swipe-select.ts', 'rowResetTimer: ReturnType<typeof setTimeout> | null;', '单行补清的还原定时器（与整页收口分离）'],
+  // 滑开状态跨页收口的策略（2026-09-21 定稿）：
+  // 切页**不收口**（"切页时宽度归零→还原"正是"快速切页后那一行滑不动"的根源，已整个移除），
+  // 滑开的行跨页保留原样；收口时机改为页面滚动（onPageScroll → closeSwipesOnScroll）。
+  ['behaviors/swipe-select.ts', 'closeSwipesOnScroll() {', '滚动收口（onPageScroll 调用，切页已不收口）'],
+  ['behaviors/swipe-select.ts', 'if (self.data.swipeReset) {', '滚动收口顺手还原归零残留（防整页滑不动）'],
+  ['behaviors/swipe-select.ts', 'rowResetTimer: ReturnType<typeof setTimeout> | null;', '单行补清的还原定时器（只服务 forceCloseRow）'],
   ['behaviors/swipe-select.ts', 'this.clearOpenSide(id);\n          return;', '多选态错位事件也清记录（防右槽宽度永久归零）'],
-  ['pages/ledger/list/index.ts', 'this.resetSwipes();', '记账列表显示/隐藏时强制收回（调用点）'],
-  ['pages/ledger/list/index.ts', 'wx.nextTick(() => this.restoreSwipeWidth());', '记账列表下一帧还原宽度（调用点）'],
-  ['pages/notes/list/index.ts', 'this.resetSwipes();', '记事列表显示/隐藏时强制收回（调用点）'],
-  ['pages/notes/list/index.ts', 'wx.nextTick(() => this.restoreSwipeWidth());', '记事列表下一帧还原宽度（调用点）'],
+  ['pages/ledger/list/index.ts', 'onPageScroll(e: { scrollTop: number })', '记账列表滚动入口（收口 + 搜索栏显隐）'],
+  ['pages/ledger/list/index.ts', 'this.closeSwipesOnScroll();', '记账列表滚动时收回滑开的行（调用点）'],
+  ['pages/notes/list/index.ts', 'onPageScroll(e: { scrollTop: number })', '记事列表滚动入口（收口 + 搜索栏显隐）'],
+  ['pages/notes/list/index.ts', 'this.closeSwipesOnScroll();', '记事列表滚动时收回滑开的行（调用点）'],
+  // 顶部搜索栏「下拉露出 / 自动收起」（2026-09-21 定稿，编排在 behaviors/search-reveal.ts）：
+  // 默认隐藏、下拉露出、往下翻或空闲 5s 收回；内容短到不能滚动时常驻（否则永远拉不出来）
+  ['utils/search-reveal.ts', 'export function searchScrollIntent(', '滚动方向 → 显隐意图（纯函数）'],
+  ['utils/search-reveal.ts', 'export function searchFitsViewport(', '内容能否滚动（纯函数）'],
+  ['behaviors/search-reveal.ts', 'export const searchRevealMixin', '搜索栏显隐编排（摊进页面选项）'],
+  ['behaviors/search-reveal.ts', 'onPageScrollSearch(scrollTop: number) {', '滚动驱动露出/收起（方法）'],
+  ['behaviors/search-reveal.ts', 'checkSearchRevealFit() {', '内容短到不能滚动时常驻露出（方法）'],
+  ['behaviors/search-reveal.ts', 'resetSearchReveal() {', '页面显示时复位（方法）'],
+  ['behaviors/swipe-select.ts', 'hideSearchIfShown?.();', '进多选顺手收起搜索栏（可选钩子）'],
+  ['pages/ledger/list/index.ts', '...searchRevealMixin,', '记账列表摊入搜索栏编排'],
+  ['pages/ledger/list/index.ts', 'this.onPageScrollSearch(e.scrollTop);', '记账列表滚动驱动搜索栏（调用点）'],
+  ['pages/ledger/list/index.ts', 'this.checkSearchRevealFit();', '记账列表刷新后校准能否滚动（调用点）'],
+  ['pages/ledger/list/index.ts', 'this.resetSearchReveal();', '记账列表显示时复位搜索栏（调用点）'],
+  ['pages/notes/list/index.ts', '...searchRevealMixin,', '记事列表摊入搜索栏编排'],
+  ['pages/notes/list/index.ts', 'this.onPageScrollSearch(e.scrollTop);', '记事列表滚动驱动搜索栏（调用点）'],
+  ['pages/notes/list/index.ts', 'this.checkSearchRevealFit();', '记事列表刷新后校准能否滚动（调用点）'],
+  ['pages/notes/list/index.ts', 'this.resetSearchReveal();', '记事列表显示时复位搜索栏（调用点）'],
+  ['pages/ledger/list/index.wxml', 'class="search-slot {{ searchShown', '记账列表搜索栏显隐容器'],
+  ['pages/ledger/list/index.wxml', 'bind:focus="onSearchFocus"', '记账列表搜索栏聚焦事件（聚焦中不收起）'],
+  ['pages/notes/list/index.wxml', 'class="search-slot {{ searchShown', '记事列表搜索栏显隐容器'],
+  ['pages/notes/list/index.wxml', 'bind:focus="onSearchFocus"', '记事列表搜索栏聚焦事件（聚焦中不收起）'],
+  // 贴顶下拉补位（2026-09-21）：页面已在顶部时 scrollTop 恒为 0，onPageScroll 拿不到
+  // "到顶后继续拖"的位移（进页直接下拉永远没反应），靠触摸位移补一路。
+  // ⚠️ 必须 capture-bind：van-swipe-cell 拖动中会 catchtouchmove 阻断冒泡，
+  // 换成 bind 则"手指落在卡片上"的 touchmove 收不到 —— 而贴顶下拉恰好全落在卡片上。
+  ['utils/search-reveal.ts', 'export function topPullIntent(', '贴顶下拉 → 露出（纯函数）'],
+  ['behaviors/search-reveal.ts', 'searchTouchY: number | null;', '贴顶下拉手势起点字段'],
+  ['behaviors/search-reveal.ts', 'onSearchTouchStart(e: SearchTouchEvent) {', '触摸开始记起点（方法）'],
+  ['behaviors/search-reveal.ts', 'onSearchTouchMove(e: SearchTouchEvent) {', '贴顶下拉露出（方法）'],
+  ['behaviors/search-reveal.ts', 'onSearchTouchEnd() {', '手指离开清起点（方法）'],
+  ['pages/ledger/list/index.wxml', 'capture-bind:touchmove="onSearchTouchMove"', '记账列表贴顶下拉（捕获阶段，调用点）'],
+  ['pages/notes/list/index.wxml', 'capture-bind:touchmove="onSearchTouchMove"', '记事列表贴顶下拉（捕获阶段，调用点）'],
   // 挂载点（调用点）单独钉住：编排抽走后，页面必须还挂着 mixin 与可见 id 钩子
   ['pages/ledger/list/index.ts', 'defineSwipeSelectPage<LedgerRecord', '记账列表挂共享滑删编排'],
   ['pages/ledger/list/index.ts', 'visibleIds()', '记账列表可见 id 钩子'],
@@ -66,6 +95,43 @@ const MARKERS = [
   ['pages/ledger/list/index.wxml', "openSideMap[item.id] === 'right'", '记账列表反向滑动不翻面'],
   ['pages/notes/list/index.wxml', "left-width=\"{{ swipeReset || selecting || openSideMap[item.id] === 'right' ? 0 : swipeWidth }}\"", '记事列表左槽宽度（含强制收回）'],
   ['pages/notes/list/index.wxml', "right-width=\"{{ swipeReset || openSideMap[item.id] === 'left' ? 0 : swipeWidth }}\"", '记事列表右槽宽度（含强制收回）'],
+  // ===== 记账列表：月份切换 + 搜索（2026-09-21）=====
+  // 汇总/占比/列表必须跟随所选月份现算，不许退回 store 的 monthSummary（那是真实当月）
+  ['pages/ledger/list/index.ts', 'summarize(ledgerStore.records, month)', '记账列表汇总按所选月份现算'],
+  ['pages/ledger/list/index.ts', 'if (isCurMonth) {', '额度提醒只与真实当月有关（看历史月不参与）'],
+  ['pages/ledger/list/index.ts', 'onPrevMonth()', '月份切换：上一月'],
+  ['pages/ledger/list/index.ts', 'onNextMonth()', '月份切换：下一月（封顶当前月）'],
+  ['pages/ledger/list/index.ts', 'onPickMonth(', '月份切换：年月选择器直达'],
+  ['pages/ledger/list/index.ts', 'this.commitSearch.cancel();', '搜索防抖 onUnload 取消'],
+  ['pages/ledger/list/index.wxml', 'fields="month"', '年月选择器（只选月）'],
+  ['pages/ledger/list/index.wxml', 'end="{{ maxMonth }}"', '选择器封顶当前月（禁止选未来）'],
+  ['pages/ledger/list/index.wxml', '<van-search', '记账列表搜索入口'],
+  ['pages/ledger/list/index.wxml', 'bindtap="onPrevMonth"', '上一月按钮（调用点）'],
+  ['pages/ledger/list/index.wxml', 'bindtap="onNextMonth"', '下一月按钮（调用点）'],
+  ['pages/ledger/list/index.wxml', 'bindchange="onPickMonth"', '年月选择器回调（调用点）'],
+  ['pages/ledger/list/index.json', '"van-search"', '记账列表注册 van-search'],
+  // ===== 首页四格快捷入口 + 记事页落点意图（2026-09-21）=====
+  ['pages/index/index.wxml', 'column-num="4"', '首页快捷入口四格'],
+  ['pages/index/index.wxml', 'bind:click="goStats"', '统计入口（调用点）'],
+  ['pages/index/index.wxml', 'bind:click="goTodos"', '待办清单入口（调用点）'],
+  ['pages/index/index.ts', 'notesStore.setPendingTab(1)', '待办清单落点意图（switchTab 不能带参）'],
+  ['store/notes.store.ts', 'setPendingTab: action(', '落点意图 action 实现'],
+  ['pages/notes/list/index.ts', 'notesStore.setPendingTab(-1)', '落点意图只生效一次（读完即清）'],
+  // ===== 记事标签（2026-09-21）=====
+  ['types/models.ts', 'tags?: string[]', 'NoteItem/NoteInput 标签字段'],
+  ['service/notes.service.ts', 'normalizeTags(value: unknown)', '标签清洗唯一口径（备份导入共用）'],
+  ['service/notes.service.ts', 'MAX_NOTE_TAGS = 10', '单条标签个数上限'],
+  ['pages/notes/edit/index.ts', 'onTagAdd()', '编辑页添加标签'],
+  ['pages/notes/edit/index.ts', 'tags: d.tags.slice()', '保存时整体写入标签集合'],
+  ['pages/notes/edit/index.wxml', 'bindtap="onTagAdd"', '添加标签按钮（调用点）'],
+  ['pages/notes/edit/index.wxml', 'catchtap="onTagRemove"', '移除标签（调用点）'],
+  ['pages/notes/list/index.ts', 'onTagFilter(', '列表按标签筛选'],
+  ['pages/notes/list/index.wxml', 'bindtap="onTagFilter"', '标签筛选胶囊（调用点）'],
+  ['components/business/note-item/index.wxml', 'note__tags', '卡片展示标签胶囊'],
+  ['utils/backup.ts', 'BACKUP_VERSION = 2', 'v2：NoteItem 增加 tags（v1 按无标签兼容）'],
+  ['utils/backup.ts', 'normalizeTags(o.tags)', '备份导入清洗 tags（调用点）'],
+  // ===== 空态微动效（2026-09-21）=====
+  ['components/empty-state/index.wxss', 'empty-float', '空态图标轻微浮动动画'],
   ['pages/notes/list/index.wxml', 'swipe-act--primary', '记事列表右滑「多选」块'],
   ['pages/notes/list/index.wxml', 'name="success"', '记事列表勾选图标'],
   ['pages/notes/list/index.ts', 'defineSwipeSelectPage<NoteItem', '记事列表挂共享滑删编排'],
@@ -232,6 +298,13 @@ const MARKERS = [
   ['pages/stats/index.ts', 'onTrendTouchMove(e: { touches: Array<{ x: number }> })', '拖动虚线跟手（方法）'],
   ['pages/stats/index.wxml', 'catchtouchmove="onTrendTouchMove"', '拖动跟手且不滚页（调用点）'],
   ['pages/stats/index.wxml', 'bindtouchstart="onTrendTouchStart"', '拖动起点（调用点）'],
+  // 去记一笔带上所选日期（2026-09-21）：回看历史月份/某天时新增，编辑页默认日期应落在所看的那天
+  ['pages/stats/index.ts', "params.push(`date=${this.data.month}-01`);", '历史月「去记一笔」带当月 1 号'],
+  ['pages/stats/index.ts', "params.push(`date=${this.data.date}`);", '单日模式「去记一笔」带所选日期'],
+  ['pages/ledger/edit/index.ts', "query?.date && /^\\d{4}-\\d{2}-\\d{2}$/.test(query.date)", '编辑页新增支持 ?date= 预设日期'],
+  // 饼图配色不含绿/青绿（用户口径：支出场景绿色易被当成收入）——测试与注释双重钉住
+  ['utils/chart.ts', '刻意不含绿 / 青绿色系', '配色注释：支出场景不用绿'],
+  ['tests/utils/chart.test.ts', '配色不含绿 / 青绿色系', '配色禁止回归测试'],
   // 待办截止时间 + 到期横幅（2026-09-20）：实现 + 调用点成对登记
   ['utils/todo-remind.ts', 'export function dueBannerView', '到期横幅聚合纯函数'],
   ['pages/index/index.ts', 'dueBannerView(pending, Date.now())', '首页横幅数据来自纯函数'],
@@ -250,8 +323,7 @@ const MARKERS = [
   // 于是"记录清了、行还开着"，那一行从此滑不动却看不出异常。实例树按组件内部 offset 找才可靠。
   ['behaviors/swipe-select.ts', 'function collectOpenCells(): SwipeCellLike[]', '按实例 offset 扫描已滑开的行'],
   ['behaviors/swipe-select.ts', 'if (typeof n.offset === \'number\' && n.offset !== 0) found.push(n as SwipeCellLike);', '扫描以内部 offset 为准'],
-  ['behaviors/swipe-select.ts', 'collectOpenCells().forEach((inst) => inst.close?.());', 'resetSwipes 先按实例收干净'],
-  ['behaviors/swipe-select.ts', 'collectOpenCells().forEach((inst) => {', 'closeAllSwipes 也走实例扫描'],
+  ['behaviors/swipe-select.ts', 'collectOpenCells().forEach((inst) => {', 'closeAllSwipes 走实例扫描'],
   ['behaviors/swipe-select.ts', 'export const SWIPE_ROW_RESET_MS = 120;', '单行补清的还原等待'],
   ['behaviors/swipe-select.ts', 'forceCloseRow(id: string)', '单行强制收回（touchend 补清，不依赖实例）'],
   ['behaviors/swipe-select.ts', 'this.forceCloseRow(id);', 'touchend 补清改为强制收回（调用点）'],
@@ -312,9 +384,18 @@ const FORBIDDEN = [
   // Vant 的 swipeMove(0) 会被宽度 observer 的 swipeMove(newWidth) 覆盖，行停在半开位
   ['behaviors/swipe-select.ts', 'SWIPE_RESET_FALLBACK_MS', '整页收口不再走"归零→还原"（改终止型）'],
   ['behaviors/swipe-select.ts', 'swipeResetTimer', 'swipeResetTimer 已并入单行的 rowResetTimer'],
-  // 两个列表页的 onHide 也不许退回 closeAllSwipes：实例查不到时是静默失败，会留下跨页脏状态
-  ['pages/ledger/list/index.ts', 'this.closeAllSwipes();', '记账列表切页收口改走 resetSwipes'],
-  ['pages/notes/list/index.ts', 'this.closeAllSwipes();', '记事列表切页收口改走 resetSwipes'],
+  // 切页收口（"归零→还原"的 resetSwipes/restoreSwipeWidth）已于 2026-09-21 整个移除，
+  // 滑开状态跨页保留原样；谁再把它加回来就会复现"快速切页后那一行滑不动"
+  ['behaviors/swipe-select.ts', 'resetSwipes', '切页收口已移除：滑开状态跨页保留，收口走滚动'],
+  ['behaviors/swipe-select.ts', 'restoreSwipeWidth', '同上：切页不再有宽度归零/还原环节'],
+  // 两个列表页不许直接调 closeAllSwipes 收口：统一走 behaviors 的 closeSwipesOnScroll（含守卫）
+  ['pages/ledger/list/index.ts', 'this.closeAllSwipes();', '记账列表滚动收口统一走 closeSwipesOnScroll'],
+  // .row-collapse 平时不能 overflow: hidden：会裁掉卡片 box-shadow，
+  // 浅色主题下记录卡失去立体感（2026-09-21 用户反馈）；裁剪只在 --out 收起动画时需要
+  ['app.wxss', '.row-collapse {\n  overflow: hidden;', '行收起容器平时不裁剪阴影'],
+  // 搜索栏收起必须是"高度归零"（.search-slot）：wx:if 会让它没有过渡、且撑开瞬间内容跳位
+  ['pages/ledger/list/index.wxml', 'wx:if="{{ searchShown }}"', '搜索栏靠高度收起，不用 wx:if'],
+  ['pages/notes/list/index.wxml', 'wx:if="{{ searchShown }}"', '搜索栏靠高度收起，不用 wx:if'],
 ];
 
 /** 排除目录（与 project.config.json 的 packOptions.ignore 思路一致） */

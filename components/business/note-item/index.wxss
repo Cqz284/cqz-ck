@@ -65,6 +65,22 @@
   margin-top: 12rpx;
 }
 
+/* 标签胶囊行：中性底色，比 meta 里的状态标签更轻，不抢待办/逾期的语义色 */
+.note__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8rpx;
+  margin-top: 12rpx;
+}
+
+.note__tag {
+  padding: 2rpx 14rpx;
+  border-radius: var(--radius-pill, 999rpx);
+  background: var(--sub-bg, rgba(0, 0, 0, 0.04));
+  color: var(--sub-text-color);
+  font-size: var(--font-hint, 22rpx);
+}
+
 .note__time {
   font-size: var(--font-hint, 22rpx);
   color: var(--sub-text-color);

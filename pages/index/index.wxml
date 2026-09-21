@@ -60,9 +60,12 @@
   </view>
 
   <view class="quick-grid enter" style="animation-delay: 60ms">
-    <van-grid column-num="2" border="{{false}}" gutter="{{20}}">
+    <!-- 四格一排：去记账 / 去记事保持直进编辑页的定稿落点；统计、待办清单分别跳对应页面 -->
+    <van-grid column-num="4" border="{{false}}" gutter="{{12}}">
       <van-grid-item icon="balance-o" text="去记账" bind:click="goAddLedger" />
       <van-grid-item icon="notes-o" text="去记事" bind:click="goAddNote" />
+      <van-grid-item icon="chart-trending-o" text="统计" bind:click="goStats" />
+      <van-grid-item icon="todo-list-o" text="待办清单" bind:click="goTodos" />
     </van-grid>
   </view>
 

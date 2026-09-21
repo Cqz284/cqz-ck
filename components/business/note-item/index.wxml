@@ -15,6 +15,10 @@
   </view>
   <view class="note__body">
     <text class="note__content {{ item.done ? 'is-done' : '' }}">{{ item.content }}</text>
+    <!-- 标签：轻量小胶囊，只展示不可点（筛选入口在列表页的标签行） -->
+    <view wx:if="{{ item.tags && item.tags.length }}" class="note__tags">
+      <text wx:for="{{ item.tags }}" wx:key="*this" class="note__tag">{{ item }}</text>
+    </view>
     <view class="note__meta">
       <text class="note__time">{{ timeText }}</text>
       <text wx:if="{{ dueEnabled }}" class="note__due note__due--{{ dueState }}">{{ dueText }}</text>

@@ -876,10 +876,23 @@ Page<StatsData, StatsCustom>({
     return Math.max(0, totalCount - known);
   },
 
-  /** 空态：去记一笔（带上当前视图的收支类型，让编辑页默认处于对应状态） */
+  /**
+   * 空态：去记一笔
+   * 带上当前视图的收支类型（编辑页默认处于对应状态）与所选日期：
+   * 回看历史月份/某天时新增，编辑页的日期应落在所看的那一天，而不是"今天"——
+   * 否则用户得手动把日期改回去（新增日期永远不晚于今天，编辑页侧还有一道钳制）。
+   */
   goAdd() {
     haptic('light');
     const typeParam = this.data.type === LedgerType.Income ? 'income' : 'expense';
-    wx.navigateTo({ url: `/pages/ledger/edit/index?type=${typeParam}` });
+    const params = [`type=${typeParam}`];
+    const curMonth = monthOf();
+    if (this.data.mode === 'day') {
+      params.push(`date=${this.data.date}`);
+    } else if (this.data.month !== curMonth) {
+      // 整月模式看历史月：落到该月 1 号（具体哪天用户自己改，但至少月份对了）
+      params.push(`date=${this.data.month}-01`);
+    }
+    wx.navigateTo({ url: `/pages/ledger/edit/index?${params.join('&')}` });
   },
 });

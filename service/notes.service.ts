@@ -12,6 +12,10 @@ import type { NoteItem, NoteInput, NoteQueryOptions } from '../types/models';
 
 /** 记事内容最大长度（与编辑页 maxlength 保持一致） */
 export const MAX_CONTENT_LEN = 2000;
+/** 单条记事的标签个数上限 */
+export const MAX_NOTE_TAGS = 10;
+/** 单个标签的最大长度 */
+export const MAX_NOTE_TAG_LEN = 20;
 
 /** 记事业务错误 */
 export class NotesError extends Error {
@@ -45,6 +49,33 @@ function normalizeContent(content: unknown): string {
 }
 
 /**
+ * 归一化标签集合（tags 字段的唯一清洗口径，service 与备份导入共用）
+ *
+ * 规则：
+ * - 逐个去首尾空格、截断到 MAX_NOTE_TAG_LEN；清洗后为空串的丢弃
+ * - 去重（保持首次出现的顺序）；最多保留 MAX_NOTE_TAGS 个
+ * - 清洗后一个不剩时返回 undefined（持久化结构里不落空数组，与 dueTime 的"清除"语义一致）
+ *
+ * @param value 入参（期望 string[]，脏值逐个丢弃而不是整组报错）
+ * @returns 清洗后的标签数组；无有效标签时为 undefined
+ */
+export function normalizeTags(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const seen = new Set<string>();
+  const tags: string[] = [];
+  value.forEach((item) => {
+    if (tags.length >= MAX_NOTE_TAGS) return;
+    const text = String(item ?? '')
+      .trim()
+      .slice(0, MAX_NOTE_TAG_LEN);
+    if (!text || seen.has(text)) return;
+    seen.add(text);
+    tags.push(text);
+  });
+  return tags.length ? tags : undefined;
+}
+
+/**
  * 校验并归一化截止时间（毫秒时间戳）
  *
  * 口径：
@@ -75,7 +106,11 @@ export class NotesService {
     if (opts.done !== undefined) list = list.filter((n) => n.done === opts.done);
     if (opts.keyword) {
       const kw = opts.keyword.trim().toLowerCase();
-      list = list.filter((n) => n.content.toLowerCase().includes(kw));
+      list = list.filter(
+        (n) =>
+          n.content.toLowerCase().includes(kw) ||
+          (n.tags ?? []).some((t: string) => t.toLowerCase().includes(kw))
+      );
     }
     return list.sort((a, b) => b.createTime - a.createTime);
   }
@@ -101,6 +136,9 @@ export class NotesService {
       updateTime: ts,
       extra: {},
     };
+    // 标签笔记与待办都可用；清洗后无有效标签则不落字段
+    const tags = normalizeTags(input.tags);
+    if (tags) item.tags = tags;
     const all = StorageService.get(StorageKeys.NotesItems) ?? [];
     StorageService.set(StorageKeys.NotesItems, [item, ...all]);
     return item;
@@ -135,6 +173,12 @@ export class NotesService {
       else delete next.dueTime;
     } else if (kind !== NoteKind.Todo) {
       delete next.dueTime;
+    }
+    // 标签：未传保持原值；传了按归一化落值（清洗后为空 = 清除全部标签）
+    if (patch.tags !== undefined) {
+      const tags = normalizeTags(patch.tags);
+      if (tags) next.tags = tags;
+      else delete next.tags;
     }
 
     const updated = all.map((n, i) => (i === idx ? next : n));

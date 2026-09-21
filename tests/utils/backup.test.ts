@@ -58,7 +58,7 @@ describe('backup · buildBackup', () => {
 
     const parsed = JSON.parse(json) as Record<string, unknown>;
     expect(parsed.app).toBe('ledger-notes');
-    expect(parsed.version).toBe(1);
+    expect(parsed.version).toBe(2);
     const records = parsed.records as Array<{ amount: number }>;
     expect(records[0].amount).toBe(1250); // 分
   });
@@ -137,6 +137,44 @@ describe('backup · parseBackup', () => {
     });
     const { payload } = parseBackup(json);
     expect(payload.quickTags).toEqual({ tags: ['餐饮', '交通'], center: '' });
+  });
+
+  test('记事 tags：v2 清洗（去空格/去重/限个），v1 无 tags 兼容', () => {
+    // v2：脏标签逐个清洗，空/重复丢弃
+    const v2 = JSON.stringify({
+      app: 'ledger-notes',
+      version: 2,
+      records: [],
+      notes: [note({ id: 'n1', tags: [' 工作 ', '工作', '', 'x'.repeat(30)] })],
+      quickTags: null,
+      settings: null,
+    });
+    const parsedV2 = parseBackup(v2);
+    expect(parsedV2.payload.notes[0].tags).toEqual(['工作', 'x'.repeat(20)]);
+
+    // v1：没有 tags 字段（旧版本备份），导入后不落该字段
+    const v1 = JSON.stringify({
+      app: 'ledger-notes',
+      version: 1,
+      records: [],
+      notes: [note({ id: 'n1' })],
+      quickTags: null,
+      settings: null,
+    });
+    const parsedV1 = parseBackup(v1);
+    expect('tags' in parsedV1.payload.notes[0]).toBe(false);
+
+    // tags 清洗后为空（全是脏值）：不落字段
+    const empty = JSON.stringify({
+      app: 'ledger-notes',
+      version: 2,
+      records: [],
+      notes: [note({ id: 'n1', tags: ['', '  '] })],
+      quickTags: null,
+      settings: null,
+    });
+    const parsedEmpty = parseBackup(empty);
+    expect('tags' in parsedEmpty.payload.notes[0]).toBe(false);
   });
 });
 

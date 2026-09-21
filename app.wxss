@@ -32,6 +32,10 @@ page {
   --accent: #ffb74d;
   --accent-soft: #fff4e3;
   --shadow-card: 0 4rpx 20rpx rgba(150, 125, 95, 0.08);
+  /* 顶部搜索栏收起容器的展开高度（.search-slot--on）。
+     ⚠️ 必须与 utils/search-reveal.ts 的 SEARCH_SLOT_HEIGHT_RPX（rpx 数值）一致：
+     JS 侧要拿它换算 px 来判断"内容够不够滚动"，两边对不上会让常驻判定偏一点。 */
+  --search-slot-h: 96rpx;
 
   /* ===== Vant 变量（浅色） ===== */
   --background-color: #ffffff;
@@ -294,6 +298,34 @@ page {
   margin-top: 6rpx;
 }
 
+/* ===== 顶部搜索栏的显隐容器（记账 / 记事列表共用；下拉露出 · 自动收起） =====
+   高度用**确定值** --search-slot-h（van-search 的自然高度，见 utils/search-reveal.ts 的
+   SEARCH_SLOT_HEIGHT_RPX）：写成 max-height 猜一个大值的话，动画后半段会"空跑"，
+   观感是抽屉先冲开再停顿。
+   ⚠️ 这里的 overflow: hidden 是必要的（与 .row-collapse 平时放开的结论相反）：
+   收起态高度为 0，不裁切的话搜索框会直接盖在下面的内容上。 ===== */
+.search-slot {
+  height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transform: translateY(-8rpx);
+  transition: height 0.24s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease,
+    transform 0.24s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.search-slot--on {
+  height: var(--search-slot-h, 96rpx);
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* van-search 撑到与容器等高（垂直居中），让"槽位高度"成为确定值；
+   拿不到这条规则也不影响功能：自然高度略小于它，只是多几 rpx 留白。 */
+.search-slot .van-search {
+  height: var(--search-slot-h, 96rpx);
+  align-items: center;
+}
+
 /* ===== 入场动画 =====
    首页分区与列表卡片依次上浮入场；错峰延迟由模板内联 animation-delay 控制。
    注意 fill-mode 用 both：延迟期间保持 from 状态（透明），不会先闪一下再动。 ===== */
@@ -335,14 +367,19 @@ page {
    起始高度由 JS 测量后写成内联 max-height（CSS 无法从 auto 过渡到 0），
    .row-collapse--out 用 !important 覆盖它，过渡才有确定的起点与终点。
    margin-bottom 一并收到 0，否则收完后还会残留一段行间距。 ===== */
+/* ⚠️ 平时不要 overflow: hidden：它会裁掉卡片 box-shadow 的四周，
+   浅色主题下记录卡看起来"贴"在背景上、没有立体感（首页 .card-row 没这层裁剪，
+   同一张 ledger-card 在首页就更有层次——2026-09-21 按用户反馈放开）。
+   裁剪只在收起动画进行时需要，由 .row-collapse--out 自己带上。 */
 .row-collapse {
-  overflow: hidden;
+  overflow: visible;
   transition: max-height 0.28s cubic-bezier(0.4, 0, 0.2, 1),
     margin-bottom 0.28s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.22s ease,
     transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .row-collapse--out {
+  overflow: hidden;
   max-height: 0 !important;
   margin-bottom: 0;
   opacity: 0;

@@ -77,11 +77,13 @@ Page<ProfileData, ProfileCustom>({
   /** 刷新概览（此前是直接复用 onShow，语义上不该把生命周期当刷新函数用） */
   refresh() {
     const usage = StorageService.usage();
+    const s = settingsStore.settings;
     this.setData({
       ledgerCount: ledgerStore.records.length,
       noteCount: notesStore.totalCount,
       pendingCount: notesStore.pendingCount,
       usageText: formatBytes(usage.bytes),
+      settingsSummary: `${s.currency} · 震动${s.haptics ? '开' : '关'}`,
     });
   },
 

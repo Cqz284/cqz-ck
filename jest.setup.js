@@ -34,7 +34,28 @@ const wxMock = {
     return { theme: 'light', platform: 'devtools', SDKVersion: '3.0.0' };
   },
   getWindowInfo() {
-    return { windowWidth: 375, safeArea: { top: 0 } };
+    return { windowWidth: 375, windowHeight: 667, safeArea: { top: 0 } };
+  },
+  /**
+   * 选择器查询（behaviors/search-reveal 用它量"内容能不能滚动"）
+   * 默认返回 0 高度：拿不到真实值时不该影响显隐判断，测试里按需覆盖
+   */
+  createSelectorQuery() {
+    const res = { scrollHeight: 0, scrollTop: 0 };
+    const query = {
+      selectViewport() {
+        return this;
+      },
+      scrollOffset(cb) {
+        if (typeof cb === 'function') cb(res);
+        return this;
+      },
+      exec(cb) {
+        if (typeof cb === 'function') cb([res]);
+        return this;
+      },
+    };
+    return query;
   },
   getDeviceInfo() {
     return { platform: 'devtools' };

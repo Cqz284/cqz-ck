@@ -34,13 +34,12 @@ export const SWIPE_CLOSE_MS = 620;
 /**
  * 单行强制收回的还原等待（ms）
  *
- * 这是**单行**补清路径用的短还原：只针对"刚抬起手指、行其实已收回但没收到 click"的情形，
- * 且必须早于用户下一次触屏（拖拽会立刻打断过渡），所以取一帧多一点即可。
+ * 这是**单行**补清路径（forceCloseRow）用的短还原：只针对"刚抬起手指、行其实已收回
+ * 但没收到 click"的情形，且必须早于用户下一次触屏（拖拽会立刻打断过渡），取一帧多一点即可。
  *
- * ⚠️ 整页收口（`resetSwipes`）**不要**用这个值，也不要走"归零 → 还原"——
- * 归零与还原挤在同一批次时，Vant 的 `swipeMove(0)` 可能被宽度 observer 的
- * `swipeMove(newWidth)` 覆盖，反而把行留在半开位。整页收口用终止型（不还原），
- * 恢复交给下一帧的 `restoreSwipeWidth()`。
+ * ⚠️ 别把这个值用到其它"归零 → 还原"的写法里：归零与还原挤在同一渲染批次时，
+ * Vant 的 `swipeMove(0)` 会被宽度 observer 的 `swipeMove(newWidth)` 覆盖，
+ * 行会停在半开位（2026-09-20 的"快速切页后滑不动"就是它；切页收口已于 2026-09-21 整个移除）。
  */
 export const SWIPE_ROW_RESET_MS = 120;
 
@@ -126,10 +125,10 @@ export interface SwipeSelectData {
   /** 撤销条文案 */
   undoText: string;
   /**
-   * 强制收回标志（页面显示时置一帧 true）
+   * 强制收回标志（单行补清 forceCloseRow 置一帧 true，滚动收口也会顺手还原残留）
    *
    * 置 true 时**两槽宽度都归零**，Vant 的 leftWidth / rightWidth observer 会对任何
-   * offset ≠ 0 的单元格调用 swipeMove(0) —— 这是唯一不依赖 `selectComponent` 实例查找的
+   * offset ≠ 0 的单元格调用 swipeMove(0) —— 这是不依赖 `selectComponent` 实例查找的
    * 关闭路径。仅靠 close() 时，实例查不到会静默失败（`inst?.close?.()`），
    * 而 Vant 内部的 offset 会一直卡在滑开位：那一行看起来是收起的，却怎么滑都不动。
    */
@@ -151,13 +150,15 @@ export interface SwipeSelectMethods {
   /**
    * 单行强制收回的还原定时器（见 forceCloseRow）
    *
-   * ⚠️ 只服务于"单行补清"这一条路径。整页收口（resetSwipes）是终止型的、不要用这个定时器 ——
-   * 那会把"归零 → 还原"重新塞回同一批次，正是"快速切页后行卡在半开位"的成因。
+   * ⚠️ 只服务于"单行补清"这一条路径，且必须**还原**（否则整页滑不出来）。
+   * 别把这个"归零 → 还原"的写法推广到其它场景：两次 setData 挤在同一批次时，
+   * Vant 的 swipeMove(0) 会被宽度 observer 的 swipeMove(newWidth) 覆盖，
+   * 行会停在半开位（"快速切页后滑不动"的成因；切页收口因此已于 2026-09-21 移除）。
    */
   rowResetTimer: ReturnType<typeof setTimeout> | null;
   /** 当前选中项 id，按列表展示顺序（与批量测量的返回顺序一一对应） */
   pickedOrder: string[];
-  /** 已滑开的行 id（切页 / 退出多选时统一收回） */
+  /** 已滑开的行 id（滚动收口 / 退出多选时统一收回） */
   openedSwipes: string[];
   /** 暂存的被删项（用于撤销） */
   stash: unknown[];
@@ -176,14 +177,11 @@ export interface SwipeSelectMethods {
    */
   forceCloseRow(id: string): void;
   /**
-   * 强制收回（页面显示时调用）：清记录 + 一帧宽度归零让 Vant 自己 swipeMove(0)
+   * 页面滚动时收回所有滑开的行（onPageScroll 里调用）
    *
-   * 与 closeAllSwipes 的区别：不依赖实例查找，实例查不到也能把卡住的行拽回来。
+   * 切页不收口（滑开状态跨页保留，用户定稿："就不动它"），滚动是主要的收口时机。
    */
-  /** 强制收回所有行（清记录 + 两槽宽度归零，不还原；页面隐藏 / 显示时调用） */
-  resetSwipes(): void;
-  /** 还原两槽宽度（页面显示后的首帧调用，与 resetSwipes 配对） */
-  restoreSwipeWidth(): void;
+  closeSwipesOnScroll(): void;
   onCellTouchEnd(e: { currentTarget: { dataset: { name?: string } } }): void;
   onCellTap(e: { currentTarget: { dataset: { name?: string } } }): void;
   /** 清掉某一行的"滑开侧"记录 */
@@ -414,44 +412,27 @@ export function createSwipeSelectMixin<T>(config: SwipeSelectConfig<T>): SwipeSe
     },
 
     /**
-     * 强制收回（页面显示时调用）
+     * 页面滚动时收回所有滑开的行（onPageScroll 里调用）
      *
-     * ⚠️ 只用实例扫描收是**不够**的（这就是"快速切页后卡住"的最后一条成因）：
-     * `inst.close()` 内部是 `swipeMove(0)` → `setData(wrapperStyle)`，而这里紧接着又把两槽宽度
-     * 归零 → 下一帧再还原。两次 setData 落在同一渲染批次里时，**Vant 的 swipeMove(0) 可能被
-     * 宽度 observer 的 `swipeMove(newWidth)` 覆盖掉**（两者的可见结果都是"拿到偏移"，
-     * 后取到的赢），于是 offset 又从 0 变成 width，而残留的 `wrapperStyle` 又把卡片平移到半开位。
-     * 现象就是用户描述的那样：能看到一小部分删除块正在往回缩，那一行却再也滑不动
-     * （`swipeMove` 的 range 钳制让再滑一点位移都没有），直到**滑别的行**触发 Vant
-     * `onDrag` 里的 `ARRAY.filter(item.offset !== 0).forEach(item.close())` 才被顺手收回。
+     * 切页不再收口：滑开状态跨页保留（2026-09-21 用户定稿，"切回来是什么样就是什么样，就不动它"），
+     * 滚动因此成为主要的收口时机 —— 也是列表类应用的惯例：滚起来，露出的操作块就该收回去。
      *
-     * 所以这里改成**终止型收口**：清记录 + 宽度归零，**不再还原一格**。
-     * 代价是这一帧的列表宽度为 0（元素 0 尺寸、不绘制），恢复由页面显示后的
-     * 首帧（`restoreSwipeWidth()`）在用户能看到之前完成 —— 比"可能把行留在半开位"安全得多。
+     * 为什么这里用 closeAllSwipes 而不是"宽度归零"：此刻用户**正看着这一页**，
+     * 归零一帧会让整列闪没；实例扫描 + close() 走 Vant 自己的 0.6s 过渡，视觉正常。
+     * 实例扫描按组件内部 offset 找（同步真值），查不到的 id 再按 openedSwipes 记录兜一层。
+     *
+     * 守卫必须便宜：onPageScroll 滚动期间高频触发，什么都没开时只做两次对象判断就返回。
      */
-    resetSwipes() {
+    closeSwipesOnScroll() {
       const self = this as unknown as SwipeSelectSelf<T>;
-      // 先把实例收干净（绝大部分情况下这一步就够了，宽度归零只是给漏网的一份保险）
-      collectOpenCells().forEach((inst) => inst.close?.());
-      self.openedSwipes = [];
-      // 归零的同时清记录：两槽宽度为 0 时 Vant 的 observer 会自己把仍在滑开的行 swipeMove(0)
-      const patch: Partial<SwipeSelectData> = { openSideMap: {}, exitMap: {} };
-      if (!self.data.swipeReset) patch.swipeReset = true;
-      self.setData(patch);
-    },
-
-    /**
-     * 还原两槽宽度（页面显示后的首帧调用）
-     *
-     * 与 `resetSwipes()` 配对：前者把宽度归零做终止型收口，这里把宽度还回去。
-     * 分成两个时机（而不是一次 setData 的"归零 → 回调还原"）的原因是：
-     * 归零与还原若挤在同一批次，Vant 的 observer 可能把 `swipeMove(0)` 的结果覆盖掉（见 resetSwipes）。
-     * 中间隔一次**真实渲染**，宽度 observer 才真正跑过、offset 才确实归了零。
-     */
-    restoreSwipeWidth() {
-      const self = this as unknown as SwipeSelectSelf<T>;
-      if (!self.data.swipeReset) return;
-      self.setData({ swipeReset: false });
+      if (self.data.selecting) return;
+      // 宽度若还停在归零帧（异常残留），顺手还原 —— 否则两槽宽度为 0，整页都滑不出来
+      if (self.data.swipeReset) {
+        self.setData({ swipeReset: false });
+      }
+      const hasOpen = self.openedSwipes.length > 0 || Object.keys(self.data.openSideMap).length > 0;
+      if (!hasOpen) return;
+      this.closeAllSwipes();
     },
 
     /**
@@ -508,11 +489,10 @@ export function createSwipeSelectMixin<T>(config: SwipeSelectConfig<T>): SwipeSe
      * 再滑一点位移就被 range 钳住，表现为"怎么滑都不动"。
      * 宽度归零一帧则是 Vant 自己会响应（observer → swipeMove(width)）的路径，不依赖实例查找。
      *
-     * ⚠️ 与整页收口（`resetSwipes`）的差别在"还原"这一步：
-     * 这里必须**还原**（否则整页滑不出来），靠 `rowResetTimer` 等一帧多一点；
+     * ⚠️ 这里必须**还原**（否则整页滑不出来），靠 `rowResetTimer` 等一帧多一点；
      * 又因为是**单行**路径、且用户此刻手指刚离开、下一次触屏会打断过渡，
      * 这里"归零 → 还原"挤在同一批次的风险极小（Vant 的 offset 此刻本来就是 0）。
-     * 整页收口不能这么做，见 resetSwipes 的注释。
+     * 把这种"归零 → 还原"推广到切页收口曾导致"快速切页后滑不动"，别再走回头路。
      *
      * @param id 记录 id
      */
@@ -587,6 +567,9 @@ export function createSwipeSelectMixin<T>(config: SwipeSelectConfig<T>): SwipeSe
       );
       // 退出靠"左滑"，不教一下不容易发现
       hintOnce(config.exitHintKey, config.exitHintText);
+      // 可选钩子：进多选就把顶部搜索栏收回去（搜索与多选是两套操作，不同时在场）。
+      // 由 behaviors/search-reveal 提供；页面没摊那个 mixin 时这里是 undefined，静默跳过。
+      (self as unknown as { hideSearchIfShown?: () => void }).hideSearchIfShown?.();
     },
 
     /**

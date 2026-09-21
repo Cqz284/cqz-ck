@@ -327,6 +327,12 @@ Page<LedgerEditData, LedgerEditCustom>({
     if (!this.data.isEdit && query?.type === 'income') {
       this.setData({ type: LedgerType.Income });
     }
+    // 新增记录支持 ?date=YYYY-MM-DD 预设日期（统计页回看历史月份/某天时「去记一笔」，
+    // 默认应落在所看的那一天而不是今天）。只认合法格式，且不晚于今天（防御未来的日期）；
+    // 编辑模式的日期始终来自记录本身
+    if (!this.data.isEdit && !this.data.date && query?.date && /^\d{4}-\d{2}-\d{2}$/.test(query.date)) {
+      this.setData({ date: query.date > today() ? today() : query.date });
+    }
     if (!this.data.date) this.setData({ date: today() });
     // 新增记录默认当前时间
     if (!this.data.time) this.setData({ time: nowTime() });

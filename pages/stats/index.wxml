@@ -37,39 +37,10 @@
     <view class="segment__item {{ isIncome ? 'is-on-income' : '' }}" hover-class="segment__item--hover" data-type="income" bindtap="setType">收入</view>
   </view>
 
-  <view class="chart-card" wx:if="{{ hasData }}">
-    <view class="chart">
-      <canvas type="2d" id="pie" class="chart__canvas" bindtap="onSliceTap"></canvas>
-      <!-- 中心文案用 HTML 叠加：颜色随主题令牌走，不必在 canvas 里另存一套配色 -->
-      <view class="chart__center">
-        <text class="chart__center-label">{{ centerLabel }}</text>
-        <text class="chart__center-value amount">{{ centerValue }}</text>
-        <text class="chart__center-hint">{{ centerHint }}</text>
-      </view>
-    </view>
-
-    <!-- 图例：点一行高亮对应扇区 -->
-    <view class="legend">
-      <view
-        wx:for="{{ rows }}"
-        wx:key="label"
-        class="legend__row {{ activeIndex === index ? 'legend__row--on' : '' }}"
-        hover-class="legend__row--hover"
-        hover-stay-time="60"
-        data-i="{{ index }}"
-        bindtap="onLegendTap"
-      >
-        <view class="legend__dot" style="background: {{ item.color }}"></view>
-        <text class="legend__label">{{ item.label }}</text>
-        <text class="legend__ratio">{{ item.ratioText }}</text>
-        <text class="legend__value">{{ item.valueText }}</text>
-      </view>
-    </view>
-  </view>
-
   <!--
     每日趋势（仅整月模式）：顶部一行上月对比摘要，紧接折线走势。
     两次点击模型：第一次点某天 = 选中（高亮 + 气泡预览日期与金额），再点同一天 = 跳当日统计。
+    放在环形图上面：点扇区/图例看到的分类明细紧贴在环形图下方，不用跨过趋势卡去找。
   -->
   <view class="trend-card" wx:if="{{ showTrend }}">
     <view class="trend__head">
@@ -102,6 +73,36 @@
       <text wx:for="{{ trendTicks }}" wx:key="*this" class="trend__tick">{{ item }}</text>
     </view>
     <view class="trend__hint">点或按住拖动选择日期，点气泡查看当日明细</view>
+  </view>
+
+  <view class="chart-card" wx:if="{{ hasData }}">
+    <view class="chart">
+      <canvas type="2d" id="pie" class="chart__canvas" bindtap="onSliceTap"></canvas>
+      <!-- 中心文案用 HTML 叠加：颜色随主题令牌走，不必在 canvas 里另存一套配色 -->
+      <view class="chart__center">
+        <text class="chart__center-label">{{ centerLabel }}</text>
+        <text class="chart__center-value amount">{{ centerValue }}</text>
+        <text class="chart__center-hint">{{ centerHint }}</text>
+      </view>
+    </view>
+
+    <!-- 图例：点一行高亮对应扇区 -->
+    <view class="legend">
+      <view
+        wx:for="{{ rows }}"
+        wx:key="label"
+        class="legend__row {{ activeIndex === index ? 'legend__row--on' : '' }}"
+        hover-class="legend__row--hover"
+        hover-stay-time="60"
+        data-i="{{ index }}"
+        bindtap="onLegendTap"
+      >
+        <view class="legend__dot" style="background: {{ item.color }}"></view>
+        <text class="legend__label">{{ item.label }}</text>
+        <text class="legend__ratio">{{ item.ratioText }}</text>
+        <text class="legend__value">{{ item.valueText }}</text>
+      </view>
+    </view>
   </view>
 
   <!--

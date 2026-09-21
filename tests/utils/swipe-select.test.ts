@@ -193,74 +193,69 @@ describe('swipe-select · 脏记录导致"看起来收起却滑不动"', () => {
     expect(data.openSideMap).toEqual({});
   });
 
-  test('resetSwipes：终止型收口（清记录 + 宽度归零），当帧不还原', () => {
-    // ⚠️ 这条用例钉的是 2026-09-20 才定位到的成因：曾经这里是"归零一帧再还原"，
-    // 两次 setData 落在同一渲染批次时，Vant 的 swipeMove(0) 会被宽度 observer 的
-    // swipeMove(newWidth) 覆盖，行反而停在半开位 —— 现象是"能看到一小部分删除块往回缩，
-    // 该行再也滑不动，直到滑别的行才被 Vant 的 onDrag 顺手收回"。
-    // 所以现在 resetSwipes 只归零、不还原；恢复交给下一帧的 restoreSwipeWidth()。
-    const { inst, data, setDataLog } = makeInstance();
-    const self = inst as unknown as { openedSwipes: string[]; resetSwipes(): void };
-    data.openSideMap = { a: 'left' };
-    data.exitMap = { a: true };
-    self.openedSwipes = ['a'];
-    self.resetSwipes();
-
-    expect(self.openedSwipes).toEqual([]);
+  test('closeSwipesOnScroll：收回开着的行并清位置记录', () => {
+    const { inst, data, offsets } = makeInstance();
+    offsets.set('b', 72);
+    const closed: string[] = [];
+    // closeAllSwipes 的主力是实例树扫描，这里造一棵"有一行开着 offset"的桩
+    const page = { $$: { offset: 0, __wxElement: { childNodes: [{ name: 'swipe', offset: 72, close: () => closed.push('swipe') }] } } };
+    (globalThis as { getCurrentPages?: () => unknown[] }).getCurrentPages = () => [page];
+    const self = inst as unknown as { openedSwipes: string[]; onSwipeOpen(e: unknown): void; closeSwipesOnScroll(): void };
+    self.onSwipeOpen({ detail: { position: 'right', name: 'b' } });
+    self.closeSwipesOnScroll();
+    expect(closed).toEqual(['swipe']);
     expect(data.openSideMap).toEqual({});
-    expect(data.exitMap).toEqual({});
-    expect(data.swipeReset).toBe(true);
-    // 只置位、不还原：整页收口的还原由页面在 onShow 的下一帧调 restoreSwipeWidth()
-    expect(setDataLog.filter((p) => p.swipeReset === false)).toHaveLength(0);
+    delete (globalThis as { getCurrentPages?: () => unknown[] }).getCurrentPages;
   });
 
-  test('restoreSwipeWidth 把宽度还回去；没归零时是空操作（幂等）', () => {
+  test('closeSwipesOnScroll：多选态不处理（滚动不打扰勾选）', () => {
+    const { inst, data, setDataLog } = makeInstance();
+    const self = inst as unknown as { onSwipeOpen(e: unknown): void; closeSwipesOnScroll(): void };
+    self.onSwipeOpen({ detail: { position: 'left', name: 'a' } }); // 进多选
+    expect(data.selecting).toBe(true);
+    const logLen = setDataLog.length;
+    self.closeSwipesOnScroll();
+    expect(data.selecting).toBe(true);
+    expect(setDataLog.length).toBe(logLen);
+  });
+
+  test('closeSwipesOnScroll：没有开着的行时是空操作（守卫必须便宜）', () => {
+    const { inst, setDataLog } = makeInstance();
+    const self = inst as unknown as { closeSwipesOnScroll(): void };
+    self.closeSwipesOnScroll();
+    expect(setDataLog).toHaveLength(0);
+  });
+
+  test('closeSwipesOnScroll：宽度归零的残留被顺手还原（防"整页滑不动"）', () => {
     const { inst, data } = makeInstance();
-    const self = inst as unknown as { resetSwipes(): void; restoreSwipeWidth(): void };
-
-    // 没归零过 → 不动（多调几次也不会把宽度弄错）
-    self.restoreSwipeWidth();
-    expect(data.swipeReset).toBe(false);
-
-    self.resetSwipes();
-    expect(data.swipeReset).toBe(true);
-    self.restoreSwipeWidth();
-    expect(data.swipeReset).toBe(false);
-    // 再调一次仍然稳定
-    self.restoreSwipeWidth();
+    const self = inst as unknown as { closeSwipesOnScroll(): void };
+    data.swipeReset = true;
+    self.closeSwipesOnScroll();
     expect(data.swipeReset).toBe(false);
   });
 });
 
-describe('swipe-select · 快速切页后的"滑不动"（2026-09-20 定位到真因）', () => {
-  test('两个列表页：onShow/onHide 走终止型收口，宽度由下一帧 restoreSwipeWidth 还原', () => {
-    // 真因是 setData 批次竞争（见 resetSwipes 注释），所以这里钉住的是**调用契约**：
-    // 切页时收口 → 下一帧还原，两步必须都在，且顺序不能反。
-    // 断言只取"真正的语句行"（去掉注释），否则解释性注释里提到旧 API 就会误判。
+describe('swipe-select · 切页不收口 + 滚动收口（2026-09-21 定稿）', () => {
+  test('两个列表页：切页不再收口，滚动经 onPageScroll 收回', () => {
+    // "切页时宽度归零→还原"正是"快速切页后那一行滑不动"的根源，已整个移除：
+    // 滑开状态跨页保留原样（用户定稿"就不动它"），收口时机改为页面滚动。
     const fs = require('fs') as typeof import('fs');
-    // 只留真正的语句行：注释里提到旧 API（closeAllSwipes）不该影响断言
-    const codeOnly = (s: string): string =>
-      s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
     ['pages/ledger/list/index.ts', 'pages/notes/list/index.ts'].forEach((rel) => {
-      const src = codeOnly(fs.readFileSync(rel, 'utf8'));
-      const show = src.slice(src.indexOf('onShow()'), src.indexOf('onHide()'));
-      // onHide 的结尾用 `refresh(extra: Partial<`（方法实现的签名）定位：
-      // 'refresh(' 与 'refresh(extra' 都会先命中文件更前面的类型声明，切出空串
-      const hide = src.slice(src.indexOf('onHide()'), src.indexOf('refresh(extra: Partial<'));
-      expect(show).toContain('this.resetSwipes();');
-      expect(show).toContain('wx.nextTick(() => this.restoreSwipeWidth());');
-      // 还原必须在收口之后
-      expect(show.indexOf('restoreSwipeWidth')).toBeGreaterThan(show.indexOf('resetSwipes'));
-      // onHide 也要收口：否则切走时留着展开态，回来才收会在返回瞬间闪一下
-      expect(hide).toContain('this.resetSwipes();');
-      // 旧的"靠 closeAllSwipes 收页"已经不该再出现（实例查不到会静默失败）
-      expect(show).not.toContain('closeAllSwipes');
-      expect(hide).not.toContain('closeAllSwipes');
+      const src = fs.readFileSync(rel, 'utf8');
+      expect(src).not.toContain('resetSwipes');
+      expect(src).not.toContain('restoreSwipeWidth');
+      // 滚动收口：onPageScroll → closeSwipesOnScroll
+      // （2026-09-21 起 onPageScroll 带 scrollTop：除了收口，还要驱动搜索栏显隐）
+      expect(src).toContain('onPageScroll(e: { scrollTop: number })');
+      expect(src).toContain('this.closeSwipesOnScroll();');
+      expect(src).toContain('this.onPageScrollSearch(e.scrollTop);');
+      // onHide 仍要作废待执行的"退出多选"提示块
+      expect(src).toContain('this.clearExitTimer();');
     });
   });
 
-  test('swipeReset 归零那一帧：模板里两槽宽度确实会变成 0（收口的驱动方式）', () => {
-    // resetSwipes 不依赖实例查找，全靠 width 归零让 Vant 的 observer 调 swipeMove(0)。
+  test('swipeReset 归零那一帧：模板里两槽宽度确实会变成 0（单行补清的驱动方式）', () => {
+    // forceCloseRow 不依赖实例查找，全靠 width 归零让 Vant 的 observer 调 swipeMove(0)。
     // 这里用模板源码钉住"归零确实作用在 left-width / right-width 上"。
     const fs = require('fs') as typeof import('fs');
     ['pages/ledger/list/index.wxml', 'pages/notes/list/index.wxml'].forEach((rel) => {
@@ -270,7 +265,7 @@ describe('swipe-select · 快速切页后的"滑不动"（2026-09-20 定位到�
     });
   });
 
-  test('resetSwipes：openedSwipes 为空也会按实例树收干净', () => {
+  test('closeAllSwipes：openedSwipes 为空也会按实例树收干净', () => {
     const data = swipeSelectData();
     const closed: string[] = [];
     const inst = Object.assign(
@@ -289,7 +284,6 @@ describe('swipe-select · 快速切页后的"滑不动"（2026-09-20 定位到�
     const self = inst as unknown as {
       data: typeof data;
       setData(p: Record<string, unknown>, cb?: () => void): void;
-      resetSwipes(): void;
       closeAllSwipes(): void;
     };
     self.data = data;
@@ -306,10 +300,6 @@ describe('swipe-select · 快速切页后的"滑不动"（2026-09-20 定位到�
     self.closeAllSwipes();
     expect(closed).toEqual(['swipe']);
 
-    closed.length = 0;
-    self.resetSwipes();
-    expect(closed).toEqual(['swipe']);
-
     delete (globalThis as { getCurrentPages?: () => unknown[] }).getCurrentPages;
   });
 
@@ -322,7 +312,7 @@ describe('swipe-select · 快速切页后的"滑不动"（2026-09-20 定位到�
     self.onCellTouchEnd({ currentTarget: { dataset: { name: 'b' } } });
     expect(data.openSideMap).toEqual({});
     expect(data.swipeReset).toBe(true);
-    // 单行路径必须自己还原（它不能像整页收口那样把宽度一直留在 0）
+    // 单行路径必须自己还原（滚动收口之外的归零都要有还原点）
     jest.advanceTimersByTime(SWIPE_ROW_RESET_MS);
     expect(data.swipeReset).toBe(false);
   });

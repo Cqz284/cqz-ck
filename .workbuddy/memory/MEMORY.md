@@ -33,6 +33,7 @@
 
 ## 主题
 - **只跟随系统**，无手动切换（2026-09-19 已移除三态切换，手动模式与 tabBar 渲染差一帧无法消除）
+- **饼图/占比条配色（PIE_COLORS）不含绿/青绿**（用户口径：支出场景绿色易被当成收入）；`--primary: #34be8c` 是应用主色，不在此口径内，别动
 - 主题变量挂 page 根：`<page-meta page-style>` 必须是页面第一个节点（fixed 平级元素要拿变量）；
   `app.wxss` **不许**再写 `@media (prefers-color-scheme: dark)` 兜底块
 - tab 页 `onShow` 第一行 `applyPageTheme(this)`（内含 applyTabBarTheme 重钉，非 tab 页调用 setTabBar* 会静默失败）
@@ -47,6 +48,23 @@
 - 首页「最近待办」只列未完成；完成走"勾选→量高钉住→下一帧收起→刷新"；进度条按全部待办统计
 - NoteItem.dueTime（毫秒，0=清除）；逾期=已过点且截止日在更早自然日，今天内过点算「今天到期」
 
+## 记事标签（2026-09-21）
+- NoteItem.tags: string[] 可选；**清洗后无有效标签就不落字段**（与 dueTime 清除语义一致）；
+  清洗唯一口径 `notes.service.normalizeTags`（去空格/截断 20/去重/限 10 个），备份导入共用
+- 搜索（service list + store visibleItems）同时命中内容与标签；列表标签筛选是**页面本地状态**
+  （activeTag + tagOptions，不进 store）；tagOptions 从全部记事收集，列表为空也保留
+- 备份 BACKUP_VERSION=2：v1 备份无 tags，导入按无标签兼容
+
+## 记账列表月份口径（2026-09-21）
+- data.month 是"正在查看的月份"（可切历史月）；汇总用 `summarize(records, month)` 现算，
+  **不许退回 store 的 monthSummary**（那是真实当月）；搜索只过滤列表、不动汇总数字
+- 额度提醒（currentBudgetAlert/resyncBudgetNotice）只与真实当月有关，看历史月时不参与（isCurMonth 闸）
+- 月份切换：‹ › 逐月 + picker fields="month" 直达，end 封顶当前月；交互与统计页同款
+
+## 跨页落点意图
+- 首页「待办清单」→ 记事页待办 tab：`notesStore.setPendingTab(1)` + switchTab（不能带参），
+  记事页 onShow 读一次立即清（-1）。仅用于 tab 落点；去编辑页仍直连（勿引入 nav-intent，用户定稿）
+
 ## 交互约定（用户确认）
 - 编辑记录=长按（首次误点 `hintOnce` 教一次）；多选=右滑进入（顺带选中）、多选态左滑退出
 - 删除唯一路径：左滑/多选批量，"整行收起→落库→底部 5 秒撤销"；编辑页无删除入口，吸底条只放全宽「保存」
@@ -55,16 +73,42 @@
 - **首页入口返回落点（定稿）**：`去记账/去记事/加待办` 直接 navigateTo 编辑页，别再引入 nav-intent
   （微信不允许 navigateTo tab 页，折中方案用户不接受）
 
-## 滑删编排（behaviors/swipe-select.ts，收口四修定稿见技能第 7.1~7.3 节）
+## 滑删编排（behaviors/swipe-select.ts；收口策略 2026-09-21 定稿，详见技能第 7.1 节）
 - 两列表页滑删/多选/删除/撤销编排全在 behaviors，页面只留 config 与 visibleIds()/refresh()
 - 页面挂载必须走 `defineSwipeSelectPage(config, page)`，别 Object.assign 直传 Page()（丢 this 类型）
 - 收行主力=实例树扫描 `collectOpenCells()`（selectComponent 会静默返回 null）
-- ⚠️ 整页收口**终止型：只归零不还原**（`resetSwipes`），宽度恢复由 onShow 下一帧 `restoreSwipeWidth()`
-  完成；"归零一帧→下一帧还原"会被 Vant observer 覆盖导致半开卡死。单行 `forceCloseRow` 则必须还原（120ms）
-- 页面接线定稿：onShow=`resetSwipes(); wx.nextTick(restoreSwipeWidth)`；onHide=`resetSwipes()`
+- ⚠️ **切页不收口（用户定稿）**：滑开的行跨页保留原样，"就不动它"。
+  曾经的"切页时两槽宽度归零→下一帧还原"会把两次 setData 挤进同一批次，
+  Vant 的 `swipeMove(0)` 被 observer 的 `swipeMove(newWidth)` 覆盖 → 行卡半开位
+  （"快速切页后滑不动"的根源），`resetSwipes`/`restoreSwipeWidth` 已整个删除（verify 有禁止回归）
+- ⚠️ **收口时机=页面滚动**：页面 `onPageScroll(e: { scrollTop })` → behaviors 的 `closeSwipesOnScroll()`
+  （多选态直接返回；什么都没开时空操作，守卫便宜；宽度归零残留顺手还原）。
+  滚动收口走 `closeAllSwipes()`（实例扫描 + close()，0.6s 过渡，用户正看着页面，不能用宽度归零闪没）
+- 单行 `forceCloseRow`（touchend 补清）必须还原（`rowResetTimer` 120ms），别推广到其它场景
 - `openSideMap` 是"哪一侧归零"的唯一依据，残留会让左滑永久失效；任何提前 return 前先清记录
 - 多选态行首 `.pick--in` 占 72rpx，卡片内边距要收窄（`.row-inner--picking`，不用 `:has()`），
   别缩勾选圈本身；记账页 ledger-card 无自带勾选圈，别顺手改
+
+## 顶部搜索栏「下拉露出」（2026-09-21 定稿，详见技能第 7.4 节）
+- 两个列表页搜索栏默认收起（`.search-slot` 高度 0）：**下拉露出、往下翻或空闲 5s 收回**；
+  有输入 / 聚焦中不收；多选态一律收起（swipe-select 的 `enterSelect` 调可选钩子 `hideSearchIfShown?.()`）
+- 驱动有**两路，各管一段**（缺一路就出"进页直接下拉没反应、得先上滑再拉"）：
+  ① `onPageScroll(e)`：`closeSwipesOnScroll()` + `onPageScrollSearch(e.scrollTop)`（中部方向判定，
+  仅 scrollTop ≤ 150px 时露出——中部上滑撑开会把下方内容整体下移 48px，叠在手指位移上像"内容自己跳"）；
+  ② 页面根挂 `capture-bind:touchstart/touchmove/touchend/touchcancel`（**贴顶补位**：页面已在顶部时
+  scrollTop 恒为 0、小程序拿不到负值，"到顶后继续拖"没有事件 → 方向判定永远 none）
+- ⚠️ 贴顶那一路**必须 capture-bind**：van-swipe-cell 有 `catchtouchmove`（拖动中阻断冒泡），换 `bind`
+  就收不到"手指落在卡片上"的 move，而贴顶下拉恰好全落在卡片上。`top` 要在 touchmove 里**现读**
+  `searchLastTop`（不能用 touchstart 快照，中部拉回顶部时手指还没松）；判定成功即清 `searchTouchY`
+  （一次手势只露一次）；已露出/多选态 touchstart 直接不记起点
+- **不用 enablePullDownRefresh**（会带微信原生转圈，且整页下移回弹 + 搜索栏撑开是双重位移）
+- 槽位高度用确定值：app.wxss 的 `--search-slot-h` ↔ `utils/search-reveal.ts` 的 `SEARCH_SLOT_HEIGHT_RPX`
+  必须同步（JS 要用它判断"内容能不能滚动"）
+- **内容短到不能滚动时搜索栏常驻**（否则用户永远做不出"下拉"这个动作）：`checkSearchRevealFit()` 在
+  refresh 末尾调用；比较时**减掉搜索栏自身占位**（否则"撑开→能滚动→收起→又不能滚动"振荡），另有 24px 余量
+- 编排接入方式：页面选项里 `...searchRevealMixin`（带 ThisType 的对象字面量），页面 Custom 接口 extends
+  `SearchRevealFields, SearchRevealMethods`。**别用 Object.assign**（丢 this 类型），也不必改
+  defineSwipeSelectPage 签名
 
 ## 备份恢复
 - 唯一实现在 utils/backup.ts，导入逐条清洗；合并=id 去重补入+标签仅未自定义时导入+设置不动；
@@ -73,3 +117,5 @@
 ## 入场过渡
 - 统一 `.enter`（app.wxss）+ 内联 animation-delay，错峰延迟压 ~120ms 以内；
   收容器与入场节点分内外两层（animation-fill-mode: both 会压住 transition 的 transform）
+- `.row-collapse`（列表行收起容器）平时**必须 `overflow: visible`**：hidden 会裁掉卡片 box-shadow，
+  浅色主题下记录卡失去立体感（2026-09-21 修）；裁剪只在 `.row-collapse--out` 收起动画期间需要

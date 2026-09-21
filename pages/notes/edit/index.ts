@@ -1,6 +1,7 @@
 import { notesStore } from '../../../store/notes.store';
 import { NoteKind } from '../../../types/models';
 import type { NoteInput } from '../../../types/models';
+import { MAX_NOTE_TAGS, MAX_NOTE_TAG_LEN } from '../../../service/notes.service';
 import { haptic } from '../../../utils/haptics';
 import { format } from '../../../utils/date';
 import { dueText } from '../../../utils/todo-remind';
@@ -57,6 +58,10 @@ interface NotesEditData {
   dueLabel: string;
   /** 今天日期 YYYY-MM-DD（日期选择器的 start 下限，不允许选过去的日期） */
   todayDate: string;
+  /** 已打的标签（编辑页内即时增删，保存时整体写入） */
+  tags: string[];
+  /** 标签输入框的绑定值 */
+  tagInput: string;
   pageStyle: string;
   pageBg: string;
   navBarBg: string;
@@ -73,6 +78,9 @@ interface NotesEditCustom {
   onDueDate(e: { detail: { value: string } }): void;
   onDueTime(e: { detail: { value: string } }): void;
   onDueClear(): void;
+  onTagInput(e: { detail: string | { value?: string } }): void;
+  onTagAdd(): void;
+  onTagRemove(e: { currentTarget: { dataset: { index: string | number } } }): void;
   onSubmit(): void;
   /** 由 dueDate / dueHM 重算行上文案 */
   syncDueLabel(): void;
@@ -92,6 +100,8 @@ Page<NotesEditData, NotesEditCustom>({
     dueHM: '',
     dueLabel: '',
     todayDate: format(Date.now(), 'YYYY-MM-DD'),
+    tags: [] as string[],
+    tagInput: '',
     pageStyle: '',
     pageBg: LIGHT_COLORS.pageBg,
     navBarBg: LIGHT_COLORS.pageBg,
@@ -121,6 +131,7 @@ Page<NotesEditData, NotesEditCustom>({
           done: item.done,
           dueDate: due ? format(due, 'YYYY-MM-DD') : '',
           dueHM: due ? format(due, 'HH:mm') : '',
+          tags: (item.tags ?? []).slice(),
         });
         this.syncDueLabel();
       }
@@ -188,6 +199,38 @@ Page<NotesEditData, NotesEditCustom>({
     this.setData({ dueDate: '', dueHM: '', dueLabel: '' });
   },
 
+  /** 标签输入框（只绑定值，添加动作在按钮/确认键上） */
+  onTagInput(e: { detail: string | { value?: string } }) {
+    this.setData({ tagInput: pickValue(e) });
+  },
+
+  /** 添加标签：去空格、去重、限长限个 */
+  onTagAdd() {
+    const text = (this.data.tagInput || '').trim().slice(0, MAX_NOTE_TAG_LEN);
+    if (!text) return;
+    if (this.data.tags.length >= MAX_NOTE_TAGS) {
+      wx.showToast({ title: `最多 ${MAX_NOTE_TAGS} 个标签`, icon: 'none' });
+      return;
+    }
+    if (this.data.tags.includes(text)) {
+      this.setData({ tagInput: '' });
+      return;
+    }
+    haptic('light');
+    this.setData({ tags: [...this.data.tags, text], tagInput: '' });
+  },
+
+  /**
+   * 移除标签
+   * @param e 事件，dataset.index 为标签序号
+   */
+  onTagRemove(e: { currentTarget: { dataset: { index: string | number } } }) {
+    const idx = Number(e.currentTarget.dataset.index);
+    if (!Number.isInteger(idx) || idx < 0 || idx >= this.data.tags.length) return;
+    haptic('light');
+    this.setData({ tags: this.data.tags.filter((_, i) => i !== idx) });
+  },
+
   /** 由 dueDate / dueHM 重算行上文案；两者不齐时提示还差一半 */
   syncDueLabel() {
     const { dueDate, dueHM } = this.data;
@@ -217,7 +260,14 @@ Page<NotesEditData, NotesEditCustom>({
       ? composeDue(d.dueDate, d.dueHM)
       : 0;
 
-    const input: NoteInput = { kind: d.kind, content, done: d.done, dueTime };
+    const input: NoteInput = {
+      kind: d.kind,
+      content,
+      done: d.done,
+      dueTime,
+      // 标签整体写入：编辑页内已即时增删，这里传最终集合（空数组 = 清除全部）
+      tags: d.tags.slice(),
+    };
 
     try {
       if (d.isEdit) notesStore.edit(d.id, input);

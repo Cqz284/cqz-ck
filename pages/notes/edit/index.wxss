@@ -29,6 +29,93 @@
   color: var(--sub-text-color) !important;
 }
 
+/* ===== 标签卡（笔记 / 待办通用） =====
+   卡片口径与 due-card 一致（inset 卡对齐）；输入行复用 due-chip 做「添加」按钮 */
+.tag-card {
+  margin: 24rpx 32rpx 0;
+  padding: 28rpx 32rpx;
+  background: var(--card-bg);
+  border-radius: var(--radius-card, 24rpx);
+  box-shadow: var(--shadow-card);
+}
+
+.tag-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.tag-card__label {
+  font-size: var(--font-sub, 24rpx);
+  color: var(--sub-text-color);
+}
+
+.tag-card__count {
+  font-size: var(--font-hint, 22rpx);
+  color: var(--sub-text-color);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 已打标签的胶囊行：可换行，× 与文字同行 */
+.tag-card__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  margin-top: 20rpx;
+}
+
+.tag-chip {
+  display: flex;
+  align-items: center;
+  padding: 6rpx 10rpx 6rpx 20rpx;
+  border-radius: var(--radius-pill, 999rpx);
+  background: var(--sub-bg, rgba(0, 0, 0, 0.04));
+}
+
+.tag-chip__text {
+  font-size: var(--font-hint, 22rpx);
+  color: var(--text-color);
+}
+
+/* × 的小热区：整圈可点，颜色继承（深浅色都随主题） */
+.tag-chip__x {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36rpx;
+  height: 36rpx;
+  margin-left: 6rpx;
+  border-radius: 50%;
+  color: var(--sub-text-color);
+}
+
+.tag-chip__x--hover {
+  opacity: 0.7;
+}
+
+/* 输入行：输入框与「添加」按钮同行；覆盖内容输入区的 360rpx 最小高度
+   （那条规则按 class 命中本页所有 van-field，标签输入框只需要一行高） */
+.tag-card__input {
+  display: flex;
+  align-items: center;
+}
+
+.tag-card__input .van-field {
+  flex: 1;
+  min-width: 0;
+}
+
+/* 内容输入区把本页所有 van-field 的输入框都撑到 360rpx 最小高，
+   标签输入框是单行，得压回去 */
+.tag-card .van-field__control {
+  min-height: 0;
+}
+
+.tag-card__add {
+  flex-shrink: 0;
+  margin-left: 16rpx;
+}
+
 /* ===== 截止时间卡（仅待办） =====
    卡片自带左右留白（inset 卡的口径由本卡自己保持与 cell-card 一致的对齐），
    与输入区之间靠入场层的叠放顺序，不留额外外边距 */

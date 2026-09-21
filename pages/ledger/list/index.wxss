@@ -30,6 +30,67 @@
 }
 
 /*
+  月份切换条（汇总卡顶部）：交互与统计页一致（‹ › 逐月翻 + 点中间弹年月选择器），
+  只是装进卡片里、尺寸略收。颜色全走主题变量，深浅色自动跟随。
+*/
+.summary__month {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8rpx;
+  margin-bottom: var(--space-gap);
+}
+
+.month-nav {
+  width: 64rpx;
+  height: 64rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 40rpx;
+  line-height: 1;
+  color: var(--text-color);
+  border-radius: 50%;
+}
+
+.month-nav--hover {
+  transform: scale(0.92);
+  opacity: 0.85;
+}
+
+/* 已在当前月：右侧按钮变灰（onNextMonth 里还有一道数字比较的闸） */
+.month-nav--off {
+  color: var(--sub-text-color);
+  opacity: 0.45;
+}
+
+/* 月份本身是一个按钮（点它弹年月选择器），做成有热区的胶囊 */
+.month-pill {
+  display: flex;
+  align-items: center;
+  padding: 10rpx 24rpx;
+  border-radius: 999rpx;
+  background: var(--border-color);
+}
+
+.month-pill--hover {
+  opacity: 0.85;
+}
+
+.month-pill__label {
+  font-size: var(--font-title, 32rpx);
+  font-weight: 500;
+  color: var(--text-color);
+}
+
+/* 下拉小箭头：靠包裹层传色（van-icon 默认 color: inherit） */
+.month-pill__caret {
+  display: flex;
+  margin-left: 8rpx;
+  color: var(--sub-text-color);
+}
+
+/*
   操作块的宽度 / 高度 / 圆角统一在 app.wxss 的 .swipe-act 里定义（= left-width / right-width 144），
   本页不再覆盖，避免两处数字不一致时又出现缝隙或高度差。
 */

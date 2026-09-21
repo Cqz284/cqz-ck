@@ -1,19 +1,48 @@
 <page-meta page-style="{{pageStyle}}"></page-meta>
 <!-- 多选入口不再占用导航栏：右滑单条内容即进入多选，多选态下左滑即退出（见下方左/右槽位） -->
 <navigation-bar title="记事" back="{{false}}" color="{{navBarColor}}" background="{{navBarBg}}"></navigation-bar>
-<view class="page" style="{{pageStyle}}">
-  <van-search
-    value="{{ keyword }}"
-    placeholder="搜索内容"
-    shape="round"
-    bind:change="onSearch"
-    background="{{pageBg}}"
-  />
+<view
+  class="page"
+  style="{{pageStyle}}"
+  capture-bind:touchstart="onSearchTouchStart"
+  capture-bind:touchmove="onSearchTouchMove"
+  capture-bind:touchend="onSearchTouchEnd"
+  capture-bind:touchcancel="onSearchTouchEnd"
+>
+  <!--
+    搜索：平时收在 .search-slot 里（高度 0，不占位也不可点）：下拉页面才露出，
+    往下翻或露出后久不操作自动收回 —— 编排在 behaviors/search-reveal.ts，样式在 app.wxss。
+  -->
+  <view class="search-slot {{ searchShown ? 'search-slot--on' : '' }}">
+    <van-search
+      value="{{ keyword }}"
+      placeholder="搜索内容"
+      shape="round"
+      bind:change="onSearch"
+      bind:focus="onSearchFocus"
+      bind:blur="onSearchBlur"
+      background="{{pageBg}}"
+    />
+  </view>
   <van-tabs active="{{ activeTab }}" bind:change="setFilter" line-width="40rpx">
     <van-tab title="全部 {{ totalCount }}"></van-tab>
     <van-tab title="待办 {{ pendingCount }}"></van-tab>
     <van-tab title="笔记"></van-tab>
   </van-tabs>
+  <!-- 标签筛选：从全部记事收集（列表为空也保留）；点选切换，再点一次取消 -->
+  <scroll-view wx:if="{{ tagOptions.length }}" scroll-x class="tag-filter enter" style="animation-delay: 40ms">
+    <view class="tag-filter__row">
+      <view
+        wx:for="{{ tagOptions }}"
+        wx:key="*this"
+        class="tag-filter__chip {{ activeTag === item ? 'is-on' : '' }}"
+        hover-class="tag-filter__chip--hover"
+        hover-stay-time="60"
+        data-tag="{{ item }}"
+        bindtap="onTagFilter"
+      >{{ item }}</view>
+    </view>
+  </scroll-view>
   <!-- 待办完成度：按全部待办统计；切到「笔记」页签时隐藏（那里本来就没有待办） -->
   <view wx:if="{{ todoBar.enabled && filter !== 'plain' }}" class="progress-row enter" style="animation-delay: 60ms">
     <view class="progress-card">

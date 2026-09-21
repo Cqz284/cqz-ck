@@ -14,6 +14,40 @@
   margin: 0 var(--space-page);
 }
 
+/* ===== 标签筛选行（页签下方）：横向滚动，选中胶囊用主色 ===== */
+.tag-filter {
+  margin-top: 16rpx;
+  white-space: nowrap;
+}
+
+.tag-filter__row {
+  display: flex;
+  flex-wrap: nowrap;
+  padding: 0 var(--space-page);
+  gap: 12rpx;
+}
+
+.tag-filter__chip {
+  flex-shrink: 0;
+  padding: 8rpx 24rpx;
+  border-radius: var(--radius-pill, 999rpx);
+  background: var(--card-bg);
+  box-shadow: var(--shadow-card);
+  font-size: var(--font-hint, 22rpx);
+  color: var(--text-color);
+  transition: background 0.16s ease, color 0.16s ease;
+}
+
+.tag-filter__chip--hover {
+  opacity: 0.85;
+}
+
+/* 选中：主色底、白字，与勾选圈同语言 */
+.tag-filter__chip.is-on {
+  background: var(--primary);
+  color: #ffffff;
+}
+
 /*
   多选态下给 note-item 的勾选圈让位（真 bug：勾被挤出卡片外看不见）
   ------------------------------------------------------------------

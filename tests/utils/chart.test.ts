@@ -87,6 +87,21 @@ describe('chart · buildPieSlices', () => {
     expect(buildPieSlices([])).toEqual([]);
     expect(buildPieSlices([{ label: 'a', value: 0 }])).toEqual([]);
   });
+
+  test('配色不含绿 / 青绿色系（支出的饼图里绿色容易被当成收入，2026-09-21 用户定稿）', () => {
+    // 绿色判定：g 通道显著高于 r，且不明显低于 b（同时覆盖纯绿 #34be8c、
+    // 橄榄 #94a15e、青绿 #3fbfc6 这三类 g 主导或 g≈b 的色）。这条钉住的是
+    // PIE_COLORS 整体，将来加新色也会被校验。
+    const isGreenish = (hex: string): boolean => {
+      const n = parseInt(hex.slice(1), 16);
+      const r = (n >> 16) & 0xff;
+      const g = (n >> 8) & 0xff;
+      const b = n & 0xff;
+      return g > r + 20 && g + 30 >= b;
+    };
+    for (const c of PIE_COLORS) expect(isGreenish(c)).toBe(false);
+    expect(isGreenish(OTHER_COLOR)).toBe(false);
+  });
 });
 
 describe('chart · buildMixSegments（占比条）', () => {

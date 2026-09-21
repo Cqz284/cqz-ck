@@ -11,7 +11,7 @@
  */
 import { StorageService, StorageKeys } from '../service/storage';
 import { LedgerService, MAX_TAG_LEN, MAX_REMARK_LEN } from '../service/ledger.service';
-import { NotesService, MAX_CONTENT_LEN } from '../service/notes.service';
+import { NotesService, MAX_CONTENT_LEN, normalizeTags } from '../service/notes.service';
 import { SettingsService } from '../service/settings.service';
 import { MAX_QUICK_TAGS } from '../service/tag.service';
 import { LedgerType, NoteKind } from '../types/models';
@@ -21,8 +21,11 @@ import { format } from './date';
 
 /** 备份标识：导入时校验，防止把别的应用的 JSON 灌进来 */
 export const BACKUP_APP = 'ledger-notes';
-/** 备份格式版本：将来字段结构变化时递增，旧版本按兼容规则处理 */
-export const BACKUP_VERSION = 1;
+/**
+ * 备份格式版本：将来字段结构变化时递增，旧版本按兼容规则处理。
+ * v2（2026-09-21）：NoteItem 增加 tags 字段；v1 备份没有 tags，导入时按"无标签"处理。
+ */
+export const BACKUP_VERSION = 2;
 
 /** 单条记账金额上限（分），与 LedgerService 的口径一致 */
 const MAX_AMOUNT_FEN = MAX_YUAN * 100;
@@ -263,6 +266,9 @@ function normalizeNote(item: unknown): NoteItem | null {
     extra,
   };
   if (dueTime && dueTime > 0) note.dueTime = dueTime;
+  // 标签：v1 备份没有该字段（undefined → 不落）；v2 逐个清洗（去空格/截断/去重/限个）
+  const tags = normalizeTags(o.tags);
+  if (tags) note.tags = tags;
   return note;
 }
 

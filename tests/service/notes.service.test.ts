@@ -152,4 +152,52 @@ describe('NotesService', () => {
       expect(n.dueTime).toBe(1);
     });
   });
+
+  describe('tags 标签（2026-09-21）', () => {
+    test('create 保留合法标签；笔记与待办都可以有', () => {
+      const a = NotesService.create({ kind: NoteKind.Plain, content: 'a', tags: ['工作', '灵感'] });
+      expect(a.tags).toEqual(['工作', '灵感']);
+      const b = NotesService.create({ kind: NoteKind.Todo, content: 'b', tags: ['采购'] });
+      expect(b.tags).toEqual(['采购']);
+    });
+
+    test('标签去空格、去重、限长、限个（脏值逐个丢弃不报错）', () => {
+      const n = NotesService.create({
+        kind: NoteKind.Plain,
+        content: 'a',
+        tags: ['  工作  ', '工作', '', 'x'.repeat(30), ...Array.from({ length: 15 }, (_, i) => `t${i}`)],
+      });
+      // 「工作」去空格后与重复项合并；超长被截断到 20；最多保留 10 个
+      expect(n.tags).toHaveLength(10);
+      expect(n.tags?.[0]).toBe('工作');
+      expect(n.tags?.every((t) => t.length <= 20)).toBe(true);
+    });
+
+    test('清洗后一个不剩时不落 tags 字段（与 dueTime 的清除语义一致）', () => {
+      const n = NotesService.create({ kind: NoteKind.Plain, content: 'a', tags: ['', '   '] });
+      expect('tags' in n).toBe(false);
+    });
+
+    test('search 关键词命中标签', () => {
+      NotesService.create({ kind: NoteKind.Plain, content: '随便写点', tags: ['灵感'] });
+      NotesService.create({ kind: NoteKind.Plain, content: '另一条' });
+      expect(NotesService.list({ keyword: '灵感' })).toHaveLength(1);
+    });
+
+    test('update 未传保持原值；空数组清除（结构里真没有该字段）', () => {
+      const n = NotesService.create({ kind: NoteKind.Plain, content: 'a', tags: ['工作'] });
+      const kept = NotesService.update(n.id, { content: 'a2' });
+      expect(kept.tags).toEqual(['工作']);
+
+      const cleared = NotesService.update(n.id, { tags: [] });
+      expect(cleared.tags).toBeUndefined();
+      expect('tags' in cleared).toBe(false);
+    });
+
+    test('update 传新集合整体替换', () => {
+      const n = NotesService.create({ kind: NoteKind.Plain, content: 'a', tags: ['旧'] });
+      const next = NotesService.update(n.id, { tags: ['新1', '新2'] });
+      expect(next.tags).toEqual(['新1', '新2']);
+    });
+  });
 });

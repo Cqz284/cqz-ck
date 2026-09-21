@@ -17,6 +17,8 @@ export interface NotesStore {
   searchKeyword: string;
   /** 列表筛选：全部 / 待办 / 普通 */
   filter: NotesFilter;
+  /** 一次性落点意图（-1 = 无）：首页入口希望记事页落到的 tab 序号 */
+  pendingTab: number;
   /** 是否加载中 */
   loading: boolean;
   /** 按关键词与筛选条件过滤后的列表 */
@@ -50,6 +52,12 @@ export interface NotesStore {
   setSearchKeyword(kw: string): void;
   /** 设置筛选类型 */
   setFilter(filter: NotesFilter): void;
+  /**
+   * 一次性落点意图：首页「待办清单」等入口希望记事页落到的 tab 序号（-1 = 无）。
+   * switchTab 不能带参数，跨页传 tab 落点只能走共享状态；
+   * 只生效一次（记事页 onShow 读取后立即清掉），平时切换不受影响。
+   */
+  setPendingTab(index: number): void;
   /** 清空全部记事 */
   clearAll(): void;
 }
@@ -61,6 +69,8 @@ export const notesStore = observable({
   searchKeyword: '',
   /** 列表筛选：全部 / 待办 / 普通 */
   filter: 'all' as NotesFilter,
+  /** 一次性落点意图（-1 = 无）：首页入口希望记事页落到的 tab 序号 */
+  pendingTab: -1,
   /** 是否加载中 */
   loading: false,
 
@@ -69,7 +79,12 @@ export const notesStore = observable({
     const kw = this.searchKeyword.trim().toLowerCase();
     return this.items.filter((n) => {
       if (this.filter !== 'all' && n.kind !== this.filter) return false;
-      if (kw && !n.content.toLowerCase().includes(kw)) return false;
+      if (
+        kw &&
+        !n.content.toLowerCase().includes(kw) &&
+        !(n.tags ?? []).some((t) => t.toLowerCase().includes(kw))
+      )
+        return false;
       return true;
     });
   },
@@ -145,6 +160,11 @@ export const notesStore = observable({
   /** 设置筛选类型 */
   setFilter: action(function (this: NotesStore, filter: NotesFilter) {
     this.filter = filter;
+  }),
+
+  /** 记一次性落点意图（记事页 onShow 读取后用 setPendingTab(-1) 清掉） */
+  setPendingTab: action(function (this: NotesStore, index: number) {
+    this.pendingTab = index;
   }),
 
   /** 清空全部记事（单次落盘，避免逐条删除的 O(n²) 写入） */
