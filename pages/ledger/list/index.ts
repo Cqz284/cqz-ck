@@ -1,11 +1,5 @@
 import { defineSwipeSelectPage, swipeSelectData } from '../../../behaviors/swipe-select';
 import type { SwipeSelectData, SwipeSelectMethods } from '../../../behaviors/swipe-select';
-import { searchRevealData, searchRevealMixin } from '../../../behaviors/search-reveal';
-import type {
-  SearchRevealData,
-  SearchRevealFields,
-  SearchRevealMethods,
-} from '../../../behaviors/search-reveal';
 import { ledgerStore } from '../../../store/ledger.store';
 import { settingsStore } from '../../../store/settings.store';
 import { summarize } from '../../../service/ledger.service';
@@ -34,8 +28,8 @@ interface DayGroupView extends LedgerDayGroup {
 /** 搜索防抖等待时长（毫秒），与记事页同口径 */
 const SEARCH_WAIT = 300;
 
-/** 页面 data（滑动多选部分由 behaviors/swipe-select 提供，搜索栏显隐由 behaviors/search-reveal 提供） */
-interface LedgerListData extends SwipeSelectData, SearchRevealData {
+/** 页面 data（滑动多选部分由 behaviors/swipe-select 提供） */
+interface LedgerListData extends SwipeSelectData {
   groups: DayGroupView[];
   incomeText: string;
   expenseText: string;
@@ -54,6 +48,8 @@ interface LedgerListData extends SwipeSelectData, SearchRevealData {
   maxMonth: string;
   /** 是否可以切到下一月（已在当前月时为 false，按钮置灰） */
   canNext: boolean;
+  /** 搜索行是否展开（导航栏右侧图标开合；收起时关键词一并清空） */
+  searchOpen: boolean;
   /** 搜索关键词（限当前所选月份内，匹配备注/标签） */
   keyword: string;
   /** 所选月份是否一条记录都没有（区分「该月没记账」与「搜索无结果」两种空态） */
@@ -72,11 +68,11 @@ interface LedgerListData extends SwipeSelectData, SearchRevealData {
  * 页面自定义实例字段与方法
  *
  * 多选/滑删/撤销的编排全部来自 behaviors/swipe-select（SwipeSelectMethods）；
- * 搜索栏「下拉露出 / 自动收起」来自 behaviors/search-reveal（SearchRevealFields + SearchRevealMethods）；
+ * 搜索入口在导航栏右侧插槽（wxml 的 slot="right"），页面自己管开合与过滤；
  * 页面只保留差异：结余滚动、汇总组装、月份切换、搜索、导航与编辑跳转，
  * 以及两个钩子 visibleIds() / refresh(extra?)。
  */
-interface LedgerListCustom extends SwipeSelectMethods, SearchRevealFields, SearchRevealMethods {
+interface LedgerListCustom extends SwipeSelectMethods {
   /** 结余滚动器（onLoad 创建，onUnload 取消） */
   roller: BalanceRoller | null;
   /** 防抖后的搜索提交（onLoad 中重建，onUnload 中取消） */
@@ -95,6 +91,10 @@ interface LedgerListCustom extends SwipeSelectMethods, SearchRevealFields, Searc
   onPickMonth(e: { detail: { value: string } }): void;
   /** 搜索框输入（防抖后过滤列表） */
   onSearch(e: { detail: string | { value?: string } }): void;
+  /** 搜索开合（导航栏右侧图标）：展开输入行；已展开时再点 = 收起并清词 */
+  onToggleSearch(): void;
+  /** 收起搜索行并清空关键词（「取消」与再次点图标共用） */
+  closeSearch(): void;
   /**
    * 只清空选中、保留多选模式
    * 用于月份/搜索变化：列表内容变了，旧的勾选要么看不见、要么语义错位，直接重置最不容易出错
@@ -128,9 +128,6 @@ Page<LedgerListData, LedgerListCustom>(
       restoreItems: (items) => ledgerStore.restore(items),
     },
     {
-      // 搜索栏编排（下拉露出 / 自动收起）：摊进页面选项即可，方法里的 this 类型依然完整
-      // （searchRevealMixin 是带 ThisType 的对象字面量，不用改 defineSwipeSelectPage 的签名）
-      ...searchRevealMixin,
       /** 结余滚动器（onLoad 创建） */
       roller: null,
       /** 防抖后的搜索提交（onLoad 中重建，onUnload 中取消） */
@@ -138,7 +135,6 @@ Page<LedgerListData, LedgerListCustom>(
 
       data: {
         ...swipeSelectData(),
-        ...searchRevealData(),
         groups: [] as DayGroupView[],
         incomeText: '¥0.00',
         expenseText: '¥0.00',
@@ -151,6 +147,7 @@ Page<LedgerListData, LedgerListCustom>(
         monthText: '',
         maxMonth: '',
         canNext: false,
+        searchOpen: false,
         keyword: '',
         monthEmpty: true,
         summaryLabel: '本月结余',
@@ -170,8 +167,6 @@ Page<LedgerListData, LedgerListCustom>(
         );
         this.commitSearch = debounce((kw: string) => {
           this.setData({ keyword: kw });
-          // 有内容就保持露出、清空则重新计时（"正在使用不收起"的口径）
-          this.syncSearchKeyword(kw);
           this.refresh();
           this.resetPick();
         }, SEARCH_WAIT);
@@ -191,8 +186,6 @@ Page<LedgerListData, LedgerListCustom>(
           this.removeTimer = null;
         }
         this.clearExitTimer();
-        // 搜索栏的空闲收起定时器一并清掉，免得页面销毁后回调还在跑
-        this.clearSearchTimer();
         detachPageTheme(this);
       },
 
@@ -210,8 +203,6 @@ Page<LedgerListData, LedgerListCustom>(
           this.setData({ undoVisible: false });
         }
         this.refresh();
-        // 搜索栏回到隐藏态（带着关键词回来则保持露出）
-        this.resetSearchReveal();
         // 切页**不**收口（2026-09-21 定稿）：滑开的删除块跨页保留原样，"就不动它"。
         // 之前的"切页时宽度归零→还原"正是"快速切页后那一行滑不动"的根源，已整个移除；
         // 收口时机改为页面滚动（onPageScroll → closeSwipesOnScroll）。
@@ -224,14 +215,9 @@ Page<LedgerListData, LedgerListCustom>(
         this.clearExitTimer();
       },
 
-      /**
-       * 页面滚动，一次处理两件事：
-       * 1) 收回滑开的行：列表滚起来，露出的删除/多选块就该收回去
-       * 2) 顶部搜索栏显隐：下拉露出、往下翻收起（方向判定在 utils/search-reveal）
-       */
+      /** 页面滚动：收回滑开的行（列表滚起来，露出的删除/多选块就该收回去） */
       onPageScroll(e: { scrollTop: number }) {
         this.closeSwipesOnScroll();
-        this.onPageScrollSearch(e.scrollTop);
       },
 
       /**
@@ -354,6 +340,26 @@ Page<LedgerListData, LedgerListCustom>(
       onSearch(e: { detail: string | { value?: string } }) {
         const kw = typeof e.detail === 'string' ? e.detail : e.detail?.value ?? '';
         this.commitSearch(kw);
+      },
+
+      /** 搜索开合：展开输入行（自动聚焦）；已展开时再点 = 收起并清词 */
+      onToggleSearch() {
+        haptic('light');
+        if (this.data.searchOpen) {
+          this.closeSearch();
+          return;
+        }
+        this.setData({ searchOpen: true });
+      },
+
+      /** 收起搜索行并清空关键词（搜索行不可见时，过滤不应还悄悄生效） */
+      closeSearch() {
+        if (!this.data.searchOpen) return;
+        // 作废未执行的防抖，否则关掉后它还会把关键词写回来
+        this.commitSearch.cancel();
+        this.setData({ searchOpen: false, keyword: '' });
+        this.refresh();
+        this.resetPick();
       },
 
       /** 只清空选中、保留多选模式（月份/搜索变化时用） */

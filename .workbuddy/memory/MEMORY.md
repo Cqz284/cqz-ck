@@ -89,48 +89,23 @@
 - 多选态行首 `.pick--in` 占 72rpx，卡片内边距要收窄（`.row-inner--picking`，不用 `:has()`），
   别缩勾选圈本身；记账页 ledger-card 无自带勾选圈，别顺手改
 
-## 顶部搜索栏「跟手下拉 + 松手吸附」（2026-09-21 第二轮定稿，详见技能第 7.4 节）
-- 位移模型：搜索栏**绝对定位在 `.pull` 上方一个槽位高**处，`.pull`（包住搜索栏与全部内容）
-  用内联 `transform: translate3d(0, Npx, 0)` 把它带进视口 —— 手指下拉多少就下移多少（1:1），
-  观感是"搜索框从上方滑入、内容整体下移"，而不是"高度从 0 撑开"（后者把搜索框压扁着展开）
-  ⚠️ `.pull` 的 transform 会给后代创建包含块，页面里不能有依赖它定位的 `position: fixed` 元素
-  （fab / 多选操作条 / 撤销条都在 `.page` 之外，安全）
-- **位移与 transition 必须拼进同一次 setData**（`pullStyleOf`）：跟手期间 `transition: none`，
-  松手换成吸附曲线；拆成两个字段会让"关过渡"与"改位移"落不同帧 → 跟手第一段被曲线吃掉、慢半拍。
-  `applyPullOffset(offset, shown)` 是位移/展开态的**唯一出口**，并顺带丢弃未完成的手势
-- 手感参数（utils/search-reveal.ts 顶部）：激活死区 `PULL_ACTIVATE_PX=6`（横向滑删的纵向漂移不误抖，
-  越过后仍严格 1:1）、阻尼 `PULL_OVERSHOOT_DAMPING=0.35` 且封顶 `PULL_MAX_RATIO=1.6`、
-  吸附门槛 `PULL_SNAP_RATIO=0.4` / 速度 `PULL_SNAP_VELOCITY=0.3`（速度优先于距离）、
-  吸附曲线 `PULL_SETTLE_EASING` 的 y>1 制造轻微过冲 ＝ iOS 橡皮筋感
-- 收起口径不变：往下翻或空闲 5s 收回；有输入 / 聚焦中不收；多选态一律收起
-  （swipe-select 的 `enterSelect` 调可选钩子 `hideSearchIfShown?.()`）
-- 驱动仍有两路，各管一段（缺一路就出"进页直接下拉没反应、得先上滑再拉"）：
-  ① `onPageScroll(e)` → `closeSwipesOnScroll()` + `onPageScrollSearch(e.scrollTop)`（中部方向判定，
-  仅 scrollTop ≤ 150px 时露出——中部上滑撑开会把下方内容整体下移，叠在手指位移上像"内容自己跳"）；
-  ② 页面根挂 `capture-bind:touchstart/touchmove/touchend/touchcancel`（贴顶跟手那一路）
-- ⚠️ 触摸那一路**必须 capture-bind**：van-swipe-cell 有 `catchtouchmove`（拖动中阻断冒泡），换 `bind`
-  就收不到"手指落在卡片上"的 move，而贴顶下拉恰好全落在卡片上。`top` 要在 touchmove 里**现读**
-  `searchLastTop`（不能用 touchstart 快照：中部拉回顶部时手指还没松）；接管判定惰性放在 touchmove
-  （要接"从中部一路拉回顶部"的手势，dy 只从贴顶那一帧起算，位移才不会突变）
-- `onSearchTouchEnd` 的**回弹一支不走 `hideSearch`**：它会被"正在使用（有输入 / 聚焦）"拦下 →
-  位移卡在半路（手指已松、内容卡中间）。回弹只表达"这段手势没拉够"
-- **不用 enablePullDownRefresh**（会带微信原生转圈，且整页下移回弹 + 搜索栏撑开是双重位移）
-- 槽位高度用确定值：app.wxss 的 `--search-slot-h` ↔ `utils/search-reveal.ts` 的 `SEARCH_SLOT_HEIGHT_RPX`
-  必须同步（JS 要用它换算 px 判"拉出量过没过吸附门槛"）
-- ⚠️ **收起态靠裁切：视口外是"裁切线"不是坐标**（2026-09-21 真机翻车：进页搜索栏就存在、闲置也不隐藏）。
-  本项目 navigationStyle: custom + **流内的** `<navigation-bar>` → **.page 上方不是视口外、而是导航栏那一条**，
-  搜索栏绝对定位到 .pull 上方一个槽位高正好落进去 → 一直可见（还压住标题），位移归零也隐藏不掉。
-  修法：两页 `.page { overflow: hidden }`（裁切线 = .page 顶边）+ **顶部留白从 .page 下移到 .pull 的
-  padding-top**（让 .pull 顶边与裁切线重合；留白挂回 .page 会露出一个留白高的尾巴）。
-  裁切容器不能与位移容器合并（overflow 的裁切矩形跟着自身 transform 走，等于没裁）
-- **"内容短到不能滚动就常驻露出"已删除**（2026-09-21）：它与"正常是隐藏状态"直接冲突；而且跟手版的下拉
-  走**触摸**事件、不依赖能不能滚动，短列表照样拉得出来 → 例外没有存在理由。
-  `searchFitsViewport` / `checkSearchRevealFit` / `searchUnscrollable` / `SEARCH_FIT_SLACK_PX` 全删净
-  （verify 已登记禁止回归）。**搜索栏任何内容长度都默认隐藏、闲置都会收起**
-- 编排接入方式：页面选项里 `...searchRevealMixin`（带 ThisType 的对象字面量），页面 Custom 接口 extends
-  `SearchRevealFields, SearchRevealMethods`。**别用 Object.assign**（丢 this 类型），也不必改
-  defineSwipeSelectPage 签名
-- 回退点：跟手版 `d0eddf7`；旧「阈值弹出 / 高度撑开」版基线 `8732595`
+## 顶部搜索「导航栏图标 + 折叠输入行」（2026-09-21 第三轮定稿，详见技能第 7.4 节）
+- **下拉跟手方案已整体废弃**：三轮迭代（阈值弹出 → 跟手吸附 → 几何修复）后 bug 不断，用户拍板
+  「搜索栏不做了，换成其他形式」。`utils/search-reveal.ts`、`behaviors/search-reveal.ts`、
+  `.pull` 位移容器、页面根 capture-bind 触摸四件套、swipe-select 的 `hideSearchIfShown` 钩子
+  **全部删净**（verify 已登记禁止回归，谁加回来就复现三轮 bug 史）
+- 现方案（纯点按，两页统一）：**导航栏右侧插槽**（`navigation-bar` 本就开了 multipleSlots，
+  `<slot name="right">` 一直在、落在胶囊左侧标准工具区）放 `van-icon name="search"` 放大镜
+  （颜色由模板按 `navBarColor` 传）；点开在导航栏下方展开一行输入框，取消/再点收起并清词
+- 折叠容器 `.search-fold`（app.wxss）：`height 0 ↔ var(--search-slot-h, 96rpx)` + 淡入 +
+  `translateY(-8rpx)→0`，260ms 缓出；收起态**必须 overflow: hidden**；`data.searchOpen`
+  一个布尔驱动，无手势无位移；`focus="{{ searchOpen }}"` 展开即自动聚焦
+- `closeSearch()` 收起时**必须先 `commitSearch.cancel()`** 再清词刷新（否则防抖还会把关键词写回来）；
+  搜索行不可见时过滤不应悄悄生效 → 收起即清词。搜索语义不变：限当月（记账）、跟随页签/标签（记事）
+- `onPageScroll` 回归只做 `closeSwipesOnScroll()` 一件事
+- 经验教训：**给低频功能配复杂手势（下拉跟手/吸附）性价比极低**——动效要求越高、失败面越大；
+  入口类功能优先用「点按入口 + 简单过渡」。另外 `navigation-bar` 有现成 right slot，别再重造
+- 回退点（历史方案仅存 git）：跟手版 `d0eddf7`；「阈值弹出/高度撑开」版基线 `8732595`
 
 ## 备份恢复
 - 唯一实现在 utils/backup.ts，导入逐条清洗；合并=id 去重补入+标签仅未自定义时导入+设置不动；

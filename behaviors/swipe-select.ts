@@ -567,9 +567,6 @@ export function createSwipeSelectMixin<T>(config: SwipeSelectConfig<T>): SwipeSe
       );
       // 退出靠"左滑"，不教一下不容易发现
       hintOnce(config.exitHintKey, config.exitHintText);
-      // 可选钩子：进多选就把顶部搜索栏收回去（搜索与多选是两套操作，不同时在场）。
-      // 由 behaviors/search-reveal 提供；页面没摊那个 mixin 时这里是 undefined，静默跳过。
-      (self as unknown as { hideSearchIfShown?: () => void }).hideSearchIfShown?.();
     },
 
     /**

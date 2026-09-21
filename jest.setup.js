@@ -37,8 +37,8 @@ const wxMock = {
     return { windowWidth: 375, windowHeight: 667, safeArea: { top: 0 } };
   },
   /**
-   * 选择器查询（behaviors/search-reveal 用它量"内容能不能滚动"）
-   * 默认返回 0 高度：拿不到真实值时不该影响显隐判断，测试里按需覆盖
+   * 选择器查询（swipe-select 的 measureHeights 等用它量节点高度）
+   * 默认返回 0 高度：拿不到真实值时测试里按需覆盖
    */
   createSelectorQuery() {
     const res = { scrollHeight: 0, scrollTop: 0 };

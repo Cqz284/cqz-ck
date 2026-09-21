@@ -50,59 +50,31 @@ const MARKERS = [
   ['behaviors/swipe-select.ts', 'if (self.data.swipeReset) {', '滚动收口顺手还原归零残留（防整页滑不动）'],
   ['behaviors/swipe-select.ts', 'rowResetTimer: ReturnType<typeof setTimeout> | null;', '单行补清的还原定时器（只服务 forceCloseRow）'],
   ['behaviors/swipe-select.ts', 'this.clearOpenSide(id);\n          return;', '多选态错位事件也清记录（防右槽宽度永久归零）'],
-  ['pages/ledger/list/index.ts', 'onPageScroll(e: { scrollTop: number })', '记账列表滚动入口（收口 + 搜索栏显隐）'],
+  ['pages/ledger/list/index.ts', 'onPageScroll(e: { scrollTop: number })', '记账列表滚动入口（收口）'],
   ['pages/ledger/list/index.ts', 'this.closeSwipesOnScroll();', '记账列表滚动时收回滑开的行（调用点）'],
-  ['pages/notes/list/index.ts', 'onPageScroll(e: { scrollTop: number })', '记事列表滚动入口（收口 + 搜索栏显隐）'],
+  ['pages/notes/list/index.ts', 'onPageScroll(e: { scrollTop: number })', '记事列表滚动入口（收口）'],
   ['pages/notes/list/index.ts', 'this.closeSwipesOnScroll();', '记事列表滚动时收回滑开的行（调用点）'],
-  // 顶部搜索栏「下拉露出 / 自动收起」（2026-09-21 定稿，编排在 behaviors/search-reveal.ts）：
-  // 默认隐藏、下拉露出、往下翻或空闲 5s 收回。"短列表常驻"那条例外已删除（2026-09-21）：
-  // 它与"正常是隐藏状态"直接冲突；而且跟手版的下拉走**触摸**事件、不依赖页面能不能滚动，
-  // 短列表照样拉得出来 —— 例外没有存在理由，留着只会让搜索栏在某些页面上永远挂着。
-  ['utils/search-reveal.ts', 'export function searchScrollIntent(', '滚动方向 → 显隐意图（纯函数）'],
-  ['behaviors/search-reveal.ts', 'export const searchRevealMixin', '搜索栏显隐编排（摊进页面选项）'],
-  ['behaviors/search-reveal.ts', 'onPageScrollSearch(scrollTop: number) {', '滚动驱动露出/收起（方法）'],
-  ['behaviors/search-reveal.ts', 'resetSearchReveal() {', '页面显示时复位（方法）'],
-  ['behaviors/swipe-select.ts', 'hideSearchIfShown?.();', '进多选顺手收起搜索栏（可选钩子）'],
-  ['pages/ledger/list/index.ts', '...searchRevealMixin,', '记账列表摊入搜索栏编排'],
-  ['pages/ledger/list/index.ts', 'this.onPageScrollSearch(e.scrollTop);', '记账列表滚动驱动搜索栏（调用点）'],
-  ['pages/ledger/list/index.ts', 'this.resetSearchReveal();', '记账列表显示时复位搜索栏（调用点）'],
-  ['pages/notes/list/index.ts', '...searchRevealMixin,', '记事列表摊入搜索栏编排'],
-  ['pages/notes/list/index.ts', 'this.onPageScrollSearch(e.scrollTop);', '记事列表滚动驱动搜索栏（调用点）'],
-  ['pages/notes/list/index.ts', 'this.resetSearchReveal();', '记事列表显示时复位搜索栏（调用点）'],
-  // 收起态的"视口外"靠裁切拿到（2026-09-21 真机反馈"进页搜索栏就存在、闲置也不隐藏"）：
-  // 自定义导航栏（navigationStyle: custom + 流内的 <navigation-bar>）之下，.page 上方不是视口外、
-  // 而是导航栏那一条 —— 搜索栏绝对定位到 .pull 上方一个槽位高时正好落在里面，一直可见，
-  // 位移归零也隐藏不掉（归零只是回到同一个可见位置）。
-  // 所以两页的 .page 必须 overflow: hidden（裁切线 = .page 顶边），且顶部留白下移到 .pull 的
-  // padding-top —— 让 .pull 的顶边与裁切线重合，否则搜索栏会露一个留白高的尾巴。
-  ['pages/ledger/list/index.wxss', 'overflow: hidden;', '记账列表 .page 裁切收起态搜索栏'],
-  ['pages/ledger/list/index.wxss', '.pull {\n  padding-top: var(--space-page);', '记账列表顶部留白在 .pull（=裁切线）'],
-  ['pages/notes/list/index.wxss', 'overflow: hidden;', '记事列表 .page 裁切收起态搜索栏'],
-  ['pages/notes/list/index.wxss', '.pull {\n  padding-top: var(--space-page);', '记事列表顶部留白在 .pull（=裁切线）'],
-  ['pages/ledger/list/index.wxml', 'class="pull" style="{{ searchPullStyle }}"', '记账列表跟手位移容器（调用点）'],
-  ['pages/ledger/list/index.wxml', 'bind:focus="onSearchFocus"', '记账列表搜索栏聚焦事件（聚焦中不收起）'],
-  ['pages/notes/list/index.wxml', 'class="pull" style="{{ searchPullStyle }}"', '记事列表跟手位移容器（调用点）'],
-  ['pages/notes/list/index.wxml', 'bind:focus="onSearchFocus"', '记事列表搜索栏聚焦事件（聚焦中不收起）'],
-  // 顶部搜索栏「跟手下拉 · 松手吸附」（2026-09-21 第二轮定稿，对齐微信聊天列表顶部搜索框）：
-  // 搜索栏绝对定位在 .pull 上方一个槽位高 → 手指下拉多少 .pull 就下移多少（1:1），
-  // 拉过槽位高进阻尼段；松手按「速度优先、其次拉出量」吸附到全开或回弹。
-  // 位移与 transition 必须拼进**同一次** setData（跟手中 transition: none），
-  // 拆成两个字段会让"关过渡"与"改位移"落在不同帧 —— 跟手第一段被曲线吃掉，看着慢半拍。
-  // ⚠️ 必须 capture-bind：van-swipe-cell 拖动中会 catchtouchmove 阻断冒泡，
-  // 换成 bind 则"手指落在卡片上"的 touchmove 收不到 —— 而贴顶下拉恰好全落在卡片上。
-  ['utils/search-reveal.ts', 'export function pullOffsetFromDrag(', '手指位移 → 内容下移量（纯函数）'],
-  ['utils/search-reveal.ts', 'export const PULL_ACTIVATE_PX = 6;', '跟手激活死区（横向滑删的纵向漂移不误抖）'],
-  ['utils/search-reveal.ts', 'export function pullSnapTarget(', '松手吸附目标（纯函数）'],
-  ['behaviors/search-reveal.ts', 'searchPullOffset: number;', '当前实际位移字段（跟手逐帧更新）'],
-  ['behaviors/search-reveal.ts', 'searchTouchY: number | null;', '贴顶下拉手势起点字段'],
-  ['behaviors/search-reveal.ts', 'function pullStyleOf(offset: number, dragging: boolean): string', '位移 + 过渡拼进同一次 setData'],
-  ['behaviors/search-reveal.ts', 'onSearchTouchStart() {', '触摸开始清采样（方法）'],
-  ['behaviors/search-reveal.ts', 'onSearchTouchMove(e: SearchTouchEvent) {', '贴顶后接管、位移跟手（方法）'],
-  ['behaviors/search-reveal.ts', 'onSearchTouchEnd() {', '松手按速度/距离吸附（方法）'],
-  ['behaviors/search-reveal.ts', 'applyPullOffset(offset: number, shown: boolean) {', '位移与展开态的唯一出口（方法）'],
-  ['app.wxss', '.pull {\n  position: relative;', '跟手位移容器样式'],
-  ['pages/ledger/list/index.wxml', 'capture-bind:touchmove="onSearchTouchMove"', '记账列表贴顶下拉（捕获阶段，调用点）'],
-  ['pages/notes/list/index.wxml', 'capture-bind:touchmove="onSearchTouchMove"', '记事列表贴顶下拉（捕获阶段，调用点）'],
+  // ===== 顶部搜索：导航栏图标 + 折叠输入行（2026-09-21 第三轮定稿）=====
+  // 下拉跟手那套（utils/behaviors 的 search-reveal、.pull 位移容器、capture-bind 触摸）已整体拆除：
+  // 三轮迭代（阈值弹出 → 跟手 → 几何修复）后复杂度仍与"低频兜底功能"不匹配，用户拍板放弃。
+  // 现在是纯点按：导航栏右侧插槽（胶囊左侧工具区）放大镜图标 → 导航栏下方折叠展开输入行
+  // （height + 淡入，260ms 缓出），取消/再点收起并清词；搜索语义保持限当月（记账）与当前页签/标签（记事）。
+  ['pages/ledger/list/index.wxml', 'slot="right"', '记账列表导航栏搜索图标（右侧插槽）'],
+  ['pages/ledger/list/index.wxml', 'bindtap="onToggleSearch"', '记账列表搜索开合（调用点）'],
+  ['pages/ledger/list/index.wxml', 'bindtap="closeSearch"', '记账列表搜索取消（调用点）'],
+  ['pages/ledger/list/index.wxml', 'search-fold--on', '记账列表搜索折叠展开态'],
+  ['pages/ledger/list/index.ts', 'onToggleSearch() {', '记账列表搜索开合（方法）'],
+  ['pages/ledger/list/index.ts', 'closeSearch() {', '记账列表搜索收起清词（方法）'],
+  ['pages/ledger/list/index.ts', 'searchOpen: false,', '记账列表搜索开合状态字段'],
+  ['pages/notes/list/index.wxml', 'slot="right"', '记事列表导航栏搜索图标（右侧插槽）'],
+  ['pages/notes/list/index.wxml', 'bindtap="onToggleSearch"', '记事列表搜索开合（调用点）'],
+  ['pages/notes/list/index.wxml', 'bindtap="closeSearch"', '记事列表搜索取消（调用点）'],
+  ['pages/notes/list/index.wxml', 'search-fold--on', '记事列表搜索折叠展开态'],
+  ['pages/notes/list/index.ts', 'onToggleSearch() {', '记事列表搜索开合（方法）'],
+  ['pages/notes/list/index.ts', 'closeSearch() {', '记事列表搜索收起清词（方法）'],
+  ['pages/notes/list/index.ts', 'searchOpen: false,', '记事列表搜索开合状态字段'],
+  ['app.wxss', '.search-fold {', '搜索折叠容器（两页共用）'],
+  ['app.wxss', '.nav-search {', '导航栏搜索图标（右侧插槽内容）'],
   // 挂载点（调用点）单独钉住：编排抽走后，页面必须还挂着 mixin 与可见 id 钩子
   ['pages/ledger/list/index.ts', 'defineSwipeSelectPage<LedgerRecord', '记账列表挂共享滑删编排'],
   ['pages/ledger/list/index.ts', 'visibleIds()', '记账列表可见 id 钩子'],
@@ -410,24 +382,22 @@ const FORBIDDEN = [
   // .row-collapse 平时不能 overflow: hidden：会裁掉卡片 box-shadow，
   // 浅色主题下记录卡失去立体感（2026-09-21 用户反馈）；裁剪只在 --out 收起动画时需要
   ['app.wxss', '.row-collapse {\n  overflow: hidden;', '行收起容器平时不裁剪阴影'],
-  // 搜索栏不许退回"高度撑开"（.search-slot--on / height 过渡）：那条路把搜索框压扁着展开，
-  // 也给不出跟手感。现在收起态是位移 0（栏子停在 .pull 上方一个槽位高处，被 .page 裁掉），
-  // 露出靠 .pull 的 translate3d 跟随手指 —— 谁把高度过渡加回来就会复现"拉到阈值才整体弹出"。
-  ['pages/ledger/list/index.wxml', 'search-slot--on', '搜索栏不再用高度撑开，改跟手位移'],
-  ['pages/notes/list/index.wxml', 'search-slot--on', '搜索栏不再用高度撑开，改跟手位移'],
-  ['app.wxss', '.search-slot {\n  height: 0;', '搜索栏容器不再走高度收起'],
-  // wx:if 会让搜索栏没有过渡、且改变节点数（出场瞬间内容跳位）
-  ['pages/ledger/list/index.wxml', 'wx:if="{{ searchShown }}"', '搜索栏不用 wx:if 控制显隐'],
-  ['pages/notes/list/index.wxml', 'wx:if="{{ searchShown }}"', '搜索栏不用 wx:if 控制显隐'],
-  // 列表页 .page 的顶部留白必须留在 .pull 上（2026-09-21）：留白回到 .page 会把 .pull 的顶边
-  // 推离裁切线，收起态的搜索栏就会露出一个留白高的尾巴 —— 即用户报的"进页搜索栏就存在"。
-  ['pages/ledger/list/index.wxss', 'padding: var(--space-page) 0 340rpx;', '记账列表 .page 顶部留白已下移到 .pull（=裁切线）'],
-  ['pages/notes/list/index.wxss', 'padding: var(--space-page) 0 340rpx;', '记事列表 .page 顶部留白已下移到 .pull（=裁切线）'],
-  // "内容短到不能滚动就常驻露出"那条例外已删除（2026-09-21）：它与"正常是隐藏状态"直接冲突，
-  // 而且跟手版的下拉走触摸事件、不依赖页面能不能滚动 —— 谁把测量常驻加回来，搜索栏又会在
-  // 短列表上永远挂着、空闲也不收。
-  ['behaviors/search-reveal.ts', 'checkSearchRevealFit', '短列表常驻已删除：搜索栏任何内容长度都默认隐藏'],
-  ['utils/search-reveal.ts', 'searchFitsViewport', '同上：不再用测量内容高度决定常驻'],
+  // ===== 搜索：下拉跟手方案已废弃（2026-09-21 第三轮定稿为导航栏图标 + 折叠输入行）=====
+  // 三轮 bug 史：阈值弹出没手感 → 跟手版几何错误（自定义导航栏下"视口外"不成立）→ 修裁切。
+  // 谁把下面任何一种写法加回来，都会复现其中至少一个问题：
+  ['pages/ledger/list/index.wxml', 'search-slot', '旧结构（.search-slot 绝对定位槽）已拆除，现用 .search-fold 折叠行'],
+  ['pages/notes/list/index.wxml', 'search-slot', '旧结构（.search-slot 绝对定位槽）已拆除，现用 .search-fold 折叠行'],
+  ['pages/ledger/list/index.wxml', 'searchPullStyle', '跟手位移容器已拆除（纯点按不需要位移）'],
+  ['pages/notes/list/index.wxml', 'searchPullStyle', '跟手位移容器已拆除（纯点按不需要位移）'],
+  ['pages/ledger/list/index.wxml', 'capture-bind:touchmove="onSearchTouchMove"', '贴顶下拉触摸手势已拆除（开合靠点按）'],
+  ['pages/notes/list/index.wxml', 'capture-bind:touchmove="onSearchTouchMove"', '贴顶下拉触摸手势已拆除（开合靠点按）'],
+  ['pages/ledger/list/index.wxml', 'wx:if="{{ searchShown }}"', '旧显隐字段已不存在（现为 searchOpen 折叠行）'],
+  ['pages/notes/list/index.wxml', 'wx:if="{{ searchShown }}"', '旧显隐字段已不存在（现为 searchOpen 折叠行）'],
+  ['app.wxss', '.pull {', '下拉位移容器样式已拆除'],
+  ['pages/ledger/list/index.wxss', '.pull {', '列表页 .pull 包裹层已拆除（.page 恢复自带顶部留白）'],
+  ['pages/notes/list/index.wxss', '.pull {', '列表页 .pull 包裹层已拆除（.page 恢复自带顶部留白）'],
+  ['pages/ledger/list/index.wxss', 'overflow: hidden;', '.page 不再需要裁切收起态搜索栏（还会裁卡片阴影）'],
+  ['pages/notes/list/index.wxss', 'overflow: hidden;', '.page 不再需要裁切收起态搜索栏（还会裁卡片阴影）'],
 ];
 
 /** 排除目录（与 project.config.json 的 packOptions.ignore 思路一致） */

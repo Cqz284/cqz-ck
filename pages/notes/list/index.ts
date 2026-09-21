@@ -2,12 +2,6 @@ import { createStoreBindings } from 'mobx-miniprogram-bindings';
 import type { StoreBindings } from 'mobx-miniprogram-bindings';
 import { defineSwipeSelectPage, swipeSelectData } from '../../../behaviors/swipe-select';
 import type { SwipeSelectData, SwipeSelectMethods } from '../../../behaviors/swipe-select';
-import { searchRevealData, searchRevealMixin } from '../../../behaviors/search-reveal';
-import type {
-  SearchRevealData,
-  SearchRevealFields,
-  SearchRevealMethods,
-} from '../../../behaviors/search-reveal';
 import { notesStore } from '../../../store/notes.store';
 import type { NotesFilter } from '../../../store/notes.store';
 import { debounce } from '../../../utils/debounce';
@@ -25,9 +19,11 @@ const FILTERS: NotesFilter[] = ['all', NoteKind.Todo, NoteKind.Plain];
 /** 搜索防抖等待时长（毫秒） */
 const SEARCH_WAIT = 300;
 
-/** 页面 data（滑动多选部分由 behaviors/swipe-select 提供，搜索栏显隐由 behaviors/search-reveal 提供） */
-interface NotesListData extends SwipeSelectData, SearchRevealData {
+/** 页面 data（滑动多选部分由 behaviors/swipe-select 提供） */
+interface NotesListData extends SwipeSelectData {
   items: NoteItem[];
+  /** 搜索行是否展开（导航栏右侧图标开合；收起时关键词一并清空） */
+  searchOpen: boolean;
   keyword: string;
   filter: NotesFilter;
   activeTab: number;
@@ -49,11 +45,11 @@ interface NotesListData extends SwipeSelectData, SearchRevealData {
  * 页面自定义实例字段与方法
  *
  * 多选/滑删/撤销的编排全部来自 behaviors/swipe-select（SwipeSelectMethods）；
- * 搜索栏「下拉露出 / 自动收起」来自 behaviors/search-reveal（SearchRevealFields + SearchRevealMethods）；
+ * 搜索入口在导航栏右侧插槽（wxml 的 slot="right"），页面自己管开合与过滤；
  * 页面只保留差异：搜索、筛选、标签筛选、待办勾选、编辑跳转，以及两个钩子
  * visibleIds() / refresh(extra?)。
  */
-interface NotesListCustom extends SwipeSelectMethods, SearchRevealFields, SearchRevealMethods {
+interface NotesListCustom extends SwipeSelectMethods {
   /** store 绑定实例（onUnload 时销毁） */
   bindings: StoreBindings[];
   /** 防抖后的搜索提交（onUnload 时取消） */
@@ -66,6 +62,10 @@ interface NotesListCustom extends SwipeSelectMethods, SearchRevealFields, Search
    */
   resetPick(): void;
   onSearch(e: { detail: string | { value?: string } }): void;
+  /** 搜索开合（导航栏右侧图标）：展开输入行；已展开时再点 = 收起并清词 */
+  onToggleSearch(): void;
+  /** 收起搜索行并清空关键词（「取消」与再次点图标共用） */
+  closeSearch(): void;
   setFilter(e: { detail: { index: number } }): void;
   /** 点标签胶囊：再点一次取消（回到全部） */
   onTagFilter(e: { currentTarget: { dataset: { tag: string } } }): void;
@@ -96,9 +96,6 @@ Page<NotesListData, NotesListCustom>(
       restoreItems: (items) => notesStore.restore(items),
     },
     {
-      // 搜索栏编排（下拉露出 / 自动收起）：摊进页面选项即可，方法里的 this 类型依然完整
-      // （searchRevealMixin 是带 ThisType 的对象字面量，不用改 defineSwipeSelectPage 的签名）
-      ...searchRevealMixin,
       /** store 绑定实例（onLoad 中填充，onUnload 中销毁） */
       bindings: [] as StoreBindings[],
       /** 防抖后的搜索提交（onLoad 中重建，onUnload 中取消） */
@@ -106,8 +103,8 @@ Page<NotesListData, NotesListCustom>(
 
       data: {
         ...swipeSelectData(),
-        ...searchRevealData(),
         items: [] as NoteItem[],
+        searchOpen: false,
         keyword: '',
         filter: 'all' as NotesFilter,
         activeTab: 0,
@@ -134,8 +131,6 @@ Page<NotesListData, NotesListCustom>(
 
         this.commitSearch = debounce((kw: string) => {
           notesStore.setSearchKeyword(kw);
-          // 有内容就保持露出、清空则重新计时（"正在使用不收起"的口径）
-          this.syncSearchKeyword(kw);
           this.refresh();
           this.resetPick();
         }, SEARCH_WAIT);
@@ -152,8 +147,6 @@ Page<NotesListData, NotesListCustom>(
           this.removeTimer = null;
         }
         this.clearExitTimer();
-        // 搜索栏的空闲收起定时器一并清掉，免得页面销毁后回调还在跑
-        this.clearSearchTimer();
         // 按引用注销主题监听（无参调用会移除所有页面的监听）
         detachPageTheme(this);
       },
@@ -181,8 +174,6 @@ Page<NotesListData, NotesListCustom>(
           this.setData({ undoVisible: false });
         }
         this.refresh();
-        // 搜索栏回到隐藏态（带着关键词回来则保持露出）
-        this.resetSearchReveal();
         // 切页**不**收口（2026-09-21 定稿）：滑开的删除块跨页保留原样，"就不动它"。
         // 之前的"切页时宽度归零→还原"正是"快速切页后那一行滑不动"的根源，已整个移除；
         // 收口时机改为页面滚动（onPageScroll → closeSwipesOnScroll）。
@@ -195,14 +186,9 @@ Page<NotesListData, NotesListCustom>(
         this.clearExitTimer();
       },
 
-      /**
-       * 页面滚动，一次处理两件事：
-       * 1) 收回滑开的行：列表滚起来，露出的删除/多选块就该收回去
-       * 2) 顶部搜索栏显隐：下拉露出、往下翻收起（方向判定在 utils/search-reveal）
-       */
+      /** 页面滚动：收回滑开的行（列表滚起来，露出的删除/多选块就该收回去） */
       onPageScroll(e: { scrollTop: number }) {
         this.closeSwipesOnScroll();
-        this.onPageScrollSearch(e.scrollTop);
       },
 
       /**
@@ -254,6 +240,27 @@ Page<NotesListData, NotesListCustom>(
         const kw = typeof d === 'string' ? d : d?.value ?? '';
         this.setData({ keyword: kw });
         this.commitSearch(kw);
+      },
+
+      /** 搜索开合：展开输入行（自动聚焦）；已展开时再点 = 收起并清词 */
+      onToggleSearch() {
+        haptic('light');
+        if (this.data.searchOpen) {
+          this.closeSearch();
+          return;
+        }
+        this.setData({ searchOpen: true });
+      },
+
+      /** 收起搜索行并清空关键词（搜索行不可见时，过滤不应还悄悄生效） */
+      closeSearch() {
+        if (!this.data.searchOpen) return;
+        // 作废未执行的防抖，否则关掉后它还会把关键词写回 store
+        this.commitSearch.cancel();
+        notesStore.setSearchKeyword('');
+        this.setData({ searchOpen: false, keyword: '' });
+        this.refresh();
+        this.resetPick();
       },
 
       /**

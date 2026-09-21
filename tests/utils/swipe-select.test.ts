@@ -245,10 +245,10 @@ describe('swipe-select · 切页不收口 + 滚动收口（2026-09-21 定稿）'
       expect(src).not.toContain('resetSwipes');
       expect(src).not.toContain('restoreSwipeWidth');
       // 滚动收口：onPageScroll → closeSwipesOnScroll
-      // （2026-09-21 起 onPageScroll 带 scrollTop：除了收口，还要驱动搜索栏显隐）
+      // （2026-09-21 第三轮起搜索改走导航栏图标点按，onPageScroll 只剩收口一件事）
       expect(src).toContain('onPageScroll(e: { scrollTop: number })');
       expect(src).toContain('this.closeSwipesOnScroll();');
-      expect(src).toContain('this.onPageScrollSearch(e.scrollTop);');
+      expect(src).not.toContain('onPageScrollSearch');
       // onHide 仍要作废待执行的"退出多选"提示块
       expect(src).toContain('this.clearExitTimer();');
     });
