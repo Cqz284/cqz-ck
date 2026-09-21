@@ -27,15 +27,17 @@
         maxlength="2000"
         show-word-limit="{{true}}"
         border="{{false}}"
+        focus="{{ autoFocus }}"
         bind:change="onContent"
       />
     </van-cell-group>
   </view>
 
-  <!-- 截止时间：仅待办显示。原生 date/time 双选择器 + 两个快捷项，
-       日期与时间都选了才生效（半截选择在行上有提示） -->
-  <view class="enter" style="animation-delay: 120ms" wx:if="{{ kind === 'todo' }}">
-    <view class="due-card">
+  <!-- 截止时间卡：常驻折叠容器（统计页 detail-wrap 同款），展开/收起走高度+透明度过渡，
+       切「普通笔记/待办」不再硬跳。内层卡片不带外边距（margin 挂 wrap 上），
+       syncDueWrap 实测的是 border-box，带 margin 底部会被裁掉一条 -->
+  <view class="due-wrap {{ kind === 'todo' ? 'due-wrap--on' : '' }}" style="height: {{ dueH }}px;">
+    <view class="due-card enter" style="animation-delay: 120ms">
       <view class="due-card__head">
         <text class="due-card__label">截止时间</text>
         <view
@@ -45,8 +47,10 @@
           bindtap="onDueClear"
         >清除</view>
       </view>
-      <view class="due-card__value {{ dueLabel ? '' : 'is-empty' }}">{{ dueLabel || '不设置' }}</view>
+      <!-- 未设置态降一级（小字灰色），不与已设时间同等视觉权重 -->
+      <view class="due-card__value {{ dueLabel ? '' : 'is-empty' }}">{{ dueLabel || '未设置' }}</view>
       <view class="due-card__actions">
+        <!-- 打开选择器的动作项 = 细线幽灵按钮；直接设值的快捷项 = 主题绿填充，两种语义分开 -->
         <picker
           class="due-card__picker"
           mode="date"
@@ -54,7 +58,7 @@
           start="{{ todayDate }}"
           bindchange="onDueDate"
         >
-          <view class="due-chip" hover-class="due-chip--hover">选日期</view>
+          <view class="due-chip due-chip--ghost" hover-class="due-chip--hover">选日期</view>
         </picker>
         <picker
           class="due-card__picker"
@@ -62,51 +66,65 @@
           value="{{ dueHM || '20:00' }}"
           bindchange="onDueTime"
         >
-          <view class="due-chip" hover-class="due-chip--hover">选时间</view>
+          <view class="due-chip due-chip--ghost" hover-class="due-chip--hover">选时间</view>
         </picker>
-        <view class="due-chip" hover-class="due-chip--hover" data-type="tonight" bindtap="onDueQuick">今天 20:00</view>
-        <view class="due-chip" hover-class="due-chip--hover" data-type="tomorrow" bindtap="onDueQuick">明天 09:00</view>
+        <!-- 快捷项随当前时间动态换算（syncQuickChips）：不会设出已经过去的时间 -->
+        <view
+          wx:for="{{ quickChips }}"
+          wx:key="type"
+          class="due-chip"
+          hover-class="due-chip--hover"
+          data-type="{{ item.type }}"
+          bindtap="onDueQuick"
+        >{{ item.label }}</view>
       </view>
     </view>
   </view>
 
   <!-- 标签：笔记与待办都可打，编辑页内即时增删，保存时整体写入；
-       列表页可按标签筛选，搜索也会命中标签 -->
+       列表页可按标签筛选，搜索也会命中标签。空态留一行占位，布局不上下跳 -->
   <view class="enter" style="animation-delay: 120ms">
     <view class="tag-card">
       <view class="tag-card__head">
         <text class="tag-card__label">标签</text>
         <text class="tag-card__count">{{ tags.length }}/10</text>
       </view>
-      <view wx:if="{{ tags.length }}" class="tag-card__chips">
-        <view wx:for="{{ tags }}" wx:key="*this" class="tag-chip">
-          <text class="tag-chip__text">{{ item }}</text>
-          <view class="tag-chip__x" hover-class="tag-chip__x--hover" hover-stay-time="60" data-index="{{ index }}" catchtap="onTagRemove">
-            <van-icon name="cross" size="20rpx" color="inherit" />
+      <view class="tag-card__chips">
+        <block wx:if="{{ tags.length }}">
+          <view wx:for="{{ tags }}" wx:key="*this" class="tag-chip">
+            <text class="tag-chip__text">{{ item }}</text>
+            <view class="tag-chip__x" hover-class="tag-chip__x--hover" hover-stay-time="60" data-index="{{ index }}" catchtap="onTagRemove">
+              <van-icon name="cross" size="20rpx" color="inherit" />
+            </view>
           </view>
-        </view>
+        </block>
+        <text wx:else class="tag-card__empty">还没有标签</text>
       </view>
       <view class="tag-card__input">
         <van-field
           value="{{ tagInput }}"
-          placeholder="添加标签（最长 20 字）"
+          placeholder="输入标签，回车或点添加"
           maxlength="20"
           border="{{false}}"
           bind:change="onTagInput"
+          bind:confirm="onTagAdd"
         />
         <view class="due-chip tag-card__add" hover-class="due-chip--hover" bindtap="onTagAdd">添加</view>
       </view>
+      <!-- 字数上限与个数上限是两个意思：单字长度说明挪到极小字提示行 -->
+      <text class="tag-card__hint">单个标签最长 20 字</text>
     </view>
   </view>
 </view>
 
-<!-- 吸底操作条：只放保存。独占整行即水平居中，大小与之前完全一致；
+<!-- 吸底操作条：只放保存。内容为空时置灰（vant disabled 自带半透明），点了不再弹「内容不能为空」；
      删除不再进编辑页，统一走列表左滑 / 多选批量删除，避免同一个动作有两个入口、两种语义。 -->
 <view class="edit-bar">
   <van-button
     type="primary"
     round="{{true}}"
     custom-class="act-btn"
+    disabled="{{ !canSave }}"
     custom-style="flex: 1; margin: 0;"
     bind:click="onSubmit"
   >保存</van-button>

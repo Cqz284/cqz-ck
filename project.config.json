@@ -25,18 +25,46 @@
   "simulatorPluginLibVersion": {},
   "packOptions": {
     "ignore": [
-      { "type": "folder", "value": "tests" },
-      { "type": "folder", "value": "docs" },
-      { "type": "folder", "value": ".workbuddy" },
-      { "type": "folder", "value": ".reasonix" },
-      { "type": "folder", "value": "attachments" },
-      { "type": "file", "value": "jest.config.js" },
-      { "type": "file", "value": "jest.setup.js" },
-      { "type": "file", "value": "tsconfig.test.json" },
-      { "type": "file", "value": ".eslintrc.js" }
+      {
+        "type": "folder",
+        "value": "tests"
+      },
+      {
+        "type": "folder",
+        "value": "docs"
+      },
+      {
+        "type": "folder",
+        "value": ".workbuddy"
+      },
+      {
+        "type": "folder",
+        "value": ".reasonix"
+      },
+      {
+        "type": "folder",
+        "value": "attachments"
+      },
+      {
+        "type": "file",
+        "value": "jest.config.js"
+      },
+      {
+        "type": "file",
+        "value": "jest.setup.js"
+      },
+      {
+        "type": "file",
+        "value": "tsconfig.test.json"
+      },
+      {
+        "type": "file",
+        "value": ".eslintrc.js"
+      }
     ],
     "include": []
   },
-  "appid": "wxf3ec012ce512ea29",
-  "editorSetting": {}
+  "appid": "wx36d9aebb2ef8726c",
+  "editorSetting": {},
+  "isGameTourist": false
 }

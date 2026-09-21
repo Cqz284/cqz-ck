@@ -222,6 +222,24 @@ const MARKERS = [
   ['pages/stats/index.wxml', '<page-meta page-style', '统计页 page-meta 主题变量'],
   ['pages/about/index.wxml', '<page-meta page-style', '关于页 page-meta 主题变量'],
 
+  // —— 记事编辑页 UX 打磨（2026-09-21 评审 11 项全落地）——
+  // chip 两档语义：填充（primary-soft 绿淡底）= 直接设值；幽灵细线 = 打开选择器。
+  // ⚠️ 别再让 chip 跟 --accent 橙黄走（与全局绿色强调色像两个 App，用户点名要改）
+  ['pages/notes/edit/index.wxss', 'background: var(--primary-soft);', '记事编辑 chip 填充档统一主题绿淡底'],
+  ['pages/notes/edit/index.wxml', 'due-chip--ghost', '记事编辑选择器动作项用幽灵细线 chip（与设值项分开）'],
+  ['pages/notes/edit/index.wxss', 'transition: height 0.2s ease, opacity 0.2s ease;', '记事编辑截止卡折叠过渡（切类型不硬跳）'],
+  ['pages/notes/edit/index.ts', 'syncDueWrap() {', '记事编辑截止卡高度实测（方法）'],
+  ['pages/notes/edit/index.ts', 'this.syncDueWrap();', '记事编辑截止卡高度同步（调用点）'],
+  ['pages/notes/edit/index.ts', 'syncQuickChips() {', '记事编辑快捷截止项动态换算（方法）'],
+  ['pages/notes/edit/index.ts', 'this.syncQuickChips();', '记事编辑快捷截止项刷新（调用点）'],
+  ['pages/notes/edit/index.wxml', 'disabled="{{ !canSave }}"', '记事编辑保存按钮空态置灰'],
+  ['pages/notes/edit/index.ts', 'canSave: Boolean(content.trim())', '记事编辑内容变化同步保存可用态'],
+  ['pages/notes/edit/index.wxml', 'focus="{{ autoFocus }}"', '记事编辑新增页进入即聚焦输入框'],
+  ['pages/notes/edit/index.ts', 'autoFocus: !query?.id', '记事编辑仅新增页自动聚焦（编辑页不打扰）'],
+  ['pages/notes/edit/index.wxml', 'bind:confirm="onTagAdd"', '记事编辑键盘确认添加标签（调用点）'],
+  ['pages/notes/edit/index.wxml', '还没有标签', '记事编辑标签空态占位（布局不上下跳）'],
+  ['pages/notes/edit/index.wxml', 'tag-card__hint', '记事编辑字数说明挪出 placeholder（与个数上限分开）'],
+
   // —— 应用品牌：名称 + Logo（2026-09-21 更名「胖鼠手账」）——
   // ⚠️ 名称/Logo 唯一口径在 utils/app-info.ts；注意：真正的线上小程序名称与图标在
   // 微信公众平台后台配置，代码里只能改应用内展示（我的页/关于页/导出头）
@@ -341,7 +359,7 @@ const MARKERS = [
   ['pages/index/index.wxml', 'bindtap="goNotesList"', '首页横幅点击去记事页'],
   ['pages/notes/edit/index.ts', 'composeDue(d.dueDate, d.dueHM)', '编辑页提交时显式落 dueTime'],
   ['pages/notes/edit/index.ts', 'syncDueLabel()', '编辑页截止文案同步（调用点）'],
-  ['pages/notes/edit/index.wxml', "wx:if=\"{{ kind === 'todo' }}\"", '截止时间行仅待办显示'],
+  ['pages/notes/edit/index.wxml', 'due-wrap--on', '记事编辑截止卡仅待办展开（折叠容器，不硬切）'],
   ['service/notes.service.ts', 'function normalizeDueTime', '截止时间归一化（实现）'],
   ['components/business/note-item/index.ts', 'dueTagView(n, Date.now())', '待办行截止标签（调用点）'],
   ['components/business/note-item/index.wxml', 'wx:if="{{ dueEnabled }}"', '待办行截止标签（调用点）'],
@@ -385,6 +403,11 @@ const FORBIDDEN = [
   // 多选态要靠"左滑"退出手势，disabled 会把整个手势一起禁掉
   ['pages/ledger/list/index.wxml', 'disabled="{{ selecting }}"', '多选态不能禁用手势'],
   ['pages/notes/list/index.wxml', 'disabled="{{ selecting }}"', '多选态不能禁用手势'],
+  // 记事编辑页 UX 定稿（2026-09-21 评审）：截止卡走折叠过渡、快捷项动态换算
+  ['pages/notes/edit/index.wxml', 'wx:if="{{ kind === \'todo\' }}"', '截止卡禁止 wx:if 硬切（用 due-wrap 折叠过渡）'],
+  ['pages/notes/edit/index.wxml', '不设置', '未设置态用词统一为「未设置」（与预算页一致）'],
+  ['pages/notes/edit/index.wxss', 'min-height: 360rpx', '内容输入区最小高收紧，禁止再撑满 360rpx'],
+  ['pages/notes/edit/index.wxss', 'background: var(--accent-soft);', 'chip 禁止再跟橙黄 accent 走（统一主题绿淡底）'],
   // 旧的类名与旧口径
   ['app.wxss', '.swipe-del {', '操作块已改名 .swipe-act'],
   ['utils/group.ts', "'前天'", 'dayLabel 不再有前天文案'],

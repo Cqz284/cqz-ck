@@ -10,6 +10,18 @@ import { LIGHT_COLORS, applyPageTheme, attachPageTheme, detachPageTheme } from '
 /** 保存成功后返回上一页的延时（毫秒），让 toast 有机会显示 */
 const BACK_DELAY = 500;
 
+/** 快捷截止项（随当前时间动态换算，见 syncQuickChips） */
+interface QuickChip {
+  /** dataset 标识（onDueQuick 按它取配置） */
+  type: string;
+  /** chip 上显示的文案 */
+  label: string;
+  /** 目标小时（分钟固定 00） */
+  hour: number;
+  /** 是否顺延到明天 */
+  plusDay: boolean;
+}
+
 /**
  * 统一取值：Vant 组件的 change 事件 detail 即值本身，原生组件为 detail.value
  * @param e 事件对象
@@ -49,6 +61,10 @@ interface NotesEditData {
   isEdit: boolean;
   kind: NoteKind;
   content: string;
+  /** 内容非空才亮保存（空态置灰，点了也不给弹「内容不能为空」） */
+  canSave: boolean;
+  /** 新增页进入即聚焦内容输入框（编辑页不打扰） */
+  autoFocus: boolean;
   done: boolean;
   /** 截止日期 YYYY-MM-DD（原生 date 选择器的绑定值；空串 = 未设置） */
   dueDate: string;
@@ -56,6 +72,10 @@ interface NotesEditData {
   dueHM: string;
   /** 已设置截止时间时，行上展示的文案 */
   dueLabel: string;
+  /** 截止卡折叠容器高度（px，实测写入；0 = 收起） */
+  dueH: number;
+  /** 快捷截止项（按当前时间动态换算，onShow 时刷新） */
+  quickChips: QuickChip[];
   /** 今天日期 YYYY-MM-DD（日期选择器的 start 下限，不允许选过去的日期） */
   todayDate: string;
   /** 已打的标签（编辑页内即时增删，保存时整体写入） */
@@ -84,6 +104,10 @@ interface NotesEditCustom {
   onSubmit(): void;
   /** 由 dueDate / dueHM 重算行上文案 */
   syncDueLabel(): void;
+  /** 截止卡折叠容器高度实测（普通笔记 → 0 收起） */
+  syncDueWrap(): void;
+  /** 按当前时间换算快捷截止项 */
+  syncQuickChips(): void;
 }
 
 Page<NotesEditData, NotesEditCustom>({
@@ -95,10 +119,14 @@ Page<NotesEditData, NotesEditCustom>({
     isEdit: false,
     kind: NoteKind.Plain,
     content: '',
+    canSave: false,
+    autoFocus: false,
     done: false,
     dueDate: '',
     dueHM: '',
     dueLabel: '',
+    dueH: 0,
+    quickChips: [] as QuickChip[],
     todayDate: format(Date.now(), 'YYYY-MM-DD'),
     tags: [] as string[],
     tagInput: '',
@@ -119,6 +147,9 @@ Page<NotesEditData, NotesEditCustom>({
     // 新增页的默认类型：由记事页当前 tab（或首页入口）传进来，避免"选了待办却新建出笔记"
     if (query?.kind === NoteKind.Todo) this.setData({ kind: NoteKind.Todo });
 
+    // 新增页进入即弹键盘（用户点「去记事/加待办」就是想立刻写）；编辑页不打扰
+    this.setData({ autoFocus: !query?.id });
+
     if (query?.id) {
       const item = notesStore.items.find((n) => n.id === query.id);
       if (item) {
@@ -128,6 +159,7 @@ Page<NotesEditData, NotesEditCustom>({
           isEdit: true,
           kind: item.kind,
           content: item.content,
+          canSave: Boolean((item.content || '').trim()),
           done: item.done,
           dueDate: due ? format(due, 'YYYY-MM-DD') : '',
           dueHM: due ? format(due, 'HH:mm') : '',
@@ -136,6 +168,11 @@ Page<NotesEditData, NotesEditCustom>({
         this.syncDueLabel();
       }
     }
+  },
+
+  /** 首次渲染完成后量一次截止卡高度（onLoad 里 DOM 还没挂载，量不到） */
+  onReady() {
+    this.syncDueWrap();
   },
 
   onUnload() {
@@ -148,6 +185,8 @@ Page<NotesEditData, NotesEditCustom>({
 
   onShow() {
     applyPageTheme(this);
+    // 快捷截止项跟当前时间走（页面停留跨了 20/23 点也能在下个 onShow 刷对）
+    this.syncQuickChips();
   },
 
   /**
@@ -158,21 +197,29 @@ Page<NotesEditData, NotesEditCustom>({
     const kind = e.currentTarget.dataset.kind === NoteKind.Todo ? NoteKind.Todo : NoteKind.Plain;
     if (kind === this.data.kind) return;
     haptic('light');
-    this.setData({ kind });
+    this.setData({ kind }, () => this.syncDueWrap());
   },
 
   onContent(e: { detail: string | { value?: string } }) {
-    this.setData({ content: pickValue(e) });
+    const content = pickValue(e);
+    this.setData({ content, canSave: Boolean(content.trim()) });
   },
 
   /**
-   * 快捷截止时间：今天 20:00 / 明天 09:00
-   * @param e 事件，dataset.type 为 tonight / tomorrow
+   * 快捷截止项（今天 20:00 / 今晚 23:00 / 明早 08:00 / 明天 09:00，随时间动态换算）
+   * @param e 事件，dataset.type 为 quickChips 里的 type
    */
   onDueQuick(e: { currentTarget: { dataset: { type: string } } }) {
+    const chip = this.data.quickChips.find((c) => c.type === e.currentTarget.dataset.type);
+    if (!chip) return;
     const base = new Date();
-    if (e.currentTarget.dataset.type === 'tomorrow') base.setDate(base.getDate() + 1);
-    base.setHours(e.currentTarget.dataset.type === 'tomorrow' ? 9 : 20, 0, 0, 0);
+    if (chip.plusDay) base.setDate(base.getDate() + 1);
+    base.setHours(chip.hour, 0, 0, 0);
+    // 页面停留跨了整点（chip 文案还没刷新）时兜底顺延到明早 08:00，绝不设出过去的时间
+    if (base.getTime() <= Date.now()) {
+      base.setDate(base.getDate() + 1);
+      base.setHours(8, 0, 0, 0);
+    }
     haptic('light');
     this.setData({
       dueDate: format(base.getTime(), 'YYYY-MM-DD'),
@@ -199,7 +246,7 @@ Page<NotesEditData, NotesEditCustom>({
     this.setData({ dueDate: '', dueHM: '', dueLabel: '' });
   },
 
-  /** 标签输入框（只绑定值，添加动作在按钮/确认键上） */
+  /** 标签输入框（只绑定值，添加动作在按钮/键盘确认键上） */
   onTagInput(e: { detail: string | { value?: string } }) {
     this.setData({ tagInput: pickValue(e) });
   },
@@ -244,6 +291,40 @@ Page<NotesEditData, NotesEditCustom>({
     }
     const ts = composeDue(dueDate, dueHM);
     this.setData({ dueLabel: ts > 0 ? dueText(ts, Date.now()) : '' });
+  },
+
+  /**
+   * 截止卡折叠容器高度实测（普通笔记 → 0 收起；统计页 detail-wrap 同款模式）
+   * 内层卡片不带外边距（margin 挂 wrap 上），实测 border-box 才不会被裁掉一条
+   */
+  syncDueWrap() {
+    if (this.data.kind !== NoteKind.Todo) {
+      if (this.data.dueH !== 0) this.setData({ dueH: 0 });
+      return;
+    }
+    wx.createSelectorQuery()
+      .select('.due-card')
+      .boundingClientRect((rect) => {
+        const h = rect ? (rect as { height: number }).height : 0;
+        if (h > 0 && Math.abs(h - this.data.dueH) > 0.5) this.setData({ dueH: h });
+      })
+      .exec();
+  },
+
+  /**
+   * 按当前时间换算快捷截止项：20 点前「今天 20:00」；20-23 点「今晚 23:00」；
+   * 23 点后「明早 08:00」。第二颗固定「明天 09:00」。
+   */
+  syncQuickChips() {
+    const h = new Date().getHours();
+    const first: QuickChip = h < 20
+      ? { type: 'tonight', label: '今天 20:00', hour: 20, plusDay: false }
+      : h < 23
+        ? { type: 'night', label: '今晚 23:00', hour: 23, plusDay: false }
+        : { type: 'morning', label: '明早 08:00', hour: 8, plusDay: true };
+    this.setData({
+      quickChips: [first, { type: 'tomorrow', label: '明天 09:00', hour: 9, plusDay: true }],
+    });
   },
 
   /** 提交保存 */
