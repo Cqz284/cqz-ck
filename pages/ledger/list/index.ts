@@ -31,6 +31,14 @@ const SEARCH_WAIT = 300;
 /** 下滑自动收起搜索行的位移阈值（px）：一次明确的向下滚动才收，轻微抖动 / 回弹不打扰 */
 const SEARCH_SCROLL_HIDE_PX = 24;
 
+/**
+ * 失焦自动收起的延迟（毫秒）
+ *
+ * 给「点导航栏图标」让路：点图标那一下输入框会先 blur，若立即收起，
+ * onToggleSearch 会看到"未展开"而把它重新展开 —— 一点图标反而弹开。
+ */
+const SEARCH_BLUR_HIDE_MS = 180;
+
 /** 页面 data（滑动多选部分由 behaviors/swipe-select 提供） */
 interface LedgerListData extends SwipeSelectData {
   groups: DayGroupView[];
@@ -80,6 +88,8 @@ interface LedgerListCustom extends SwipeSelectMethods {
   roller: BalanceRoller | null;
   /** 上一次的 scrollTop（px；-1 = 尚未滚过，滚动收起搜索行用） */
   searchLastTop: number;
+  /** 失焦自动收起的延时器（点图标开合 / onUnload 时作废） */
+  searchBlurHideTimer: ReturnType<typeof setTimeout> | null;
   /** 防抖后的搜索提交（onLoad 中重建，onUnload 中取消） */
   commitSearch: DebouncedFn<(kw: string) => void>;
   refresh(extra?: Partial<LedgerListData>): void;
@@ -104,6 +114,10 @@ interface LedgerListCustom extends SwipeSelectMethods {
   collapseSearch(): void;
   /** 页面滚动驱动的自动收起（onPageScroll 调用）：向下滚过阈值才收 */
   onSearchScrollHide(scrollTop: number): void;
+  /** 输入框失焦 → 延迟收起搜索行（保留关键词；实现里有与点图标的竞争说明） */
+  onSearchBlur(): void;
+  /** 作废待执行的失焦收起 */
+  clearSearchBlurHide(): void;
   /**
    * 只清空选中、保留多选模式
    * 用于月份/搜索变化：列表内容变了，旧的勾选要么看不见、要么语义错位，直接重置最不容易出错
@@ -141,6 +155,8 @@ Page<LedgerListData, LedgerListCustom>(
       roller: null,
       /** 上一次的 scrollTop（px；-1 = 尚未滚过，首次滚动不做方向判定） */
       searchLastTop: -1,
+      /** 失焦自动收起的延时器（点图标开合 / onUnload 时作废） */
+      searchBlurHideTimer: null,
       /** 防抖后的搜索提交（onLoad 中重建，onUnload 中取消） */
       commitSearch: debounce((_kw: string) => {}, SEARCH_WAIT),
 
@@ -196,6 +212,7 @@ Page<LedgerListData, LedgerListCustom>(
           clearTimeout(this.removeTimer);
           this.removeTimer = null;
         }
+        this.clearSearchBlurHide();
         this.clearExitTimer();
         detachPageTheme(this);
       },
@@ -359,6 +376,8 @@ Page<LedgerListData, LedgerListCustom>(
       /** 搜索开合：展开输入行（自动聚焦）；已展开时再点 = 收起并清词 */
       onToggleSearch() {
         haptic('light');
+        // 作废待执行的"失焦收起"：点图标那一下会先触发输入框 blur（见 onSearchBlur）
+        this.clearSearchBlurHide();
         if (this.data.searchOpen) {
           this.closeSearch();
           return;
@@ -368,6 +387,8 @@ Page<LedgerListData, LedgerListCustom>(
 
       /** 收起搜索行并清空关键词（再次点导航栏图标；搜索行不可见时，过滤不应还悄悄生效） */
       closeSearch() {
+        // 先作废失焦收起再判早退：哪怕行已收起，也不能让残留延时器之后再动一次
+        this.clearSearchBlurHide();
         if (!this.data.searchOpen) return;
         // 作废未执行的防抖，否则关掉后它还会把关键词写回来
         this.commitSearch.cancel();
@@ -393,6 +414,28 @@ Page<LedgerListData, LedgerListCustom>(
         this.searchLastTop = scrollTop;
         if (!this.data.searchOpen) return;
         if (prev >= 0 && scrollTop - prev > SEARCH_SCROLL_HIDE_PX) this.collapseSearch();
+      },
+
+      /**
+       * 失焦自动收起（van-search 的 blur：点了页面其它地方 / 键盘「完成」）
+       * 口径与滚动收起一致：只收输入行、保留关键词（过滤结果还在下面，清词会让列表跳回全部）。
+       * 延迟 SEARCH_BLUR_HIDE_MS 是给「点导航栏图标」让路 —— 点图标那一下
+       * input 先 blur，立即收起的话 onToggleSearch 会看到"未展开"而把它重新展开。
+       */
+      onSearchBlur() {
+        if (!this.data.searchOpen) return;
+        if (this.searchBlurHideTimer) clearTimeout(this.searchBlurHideTimer);
+        this.searchBlurHideTimer = setTimeout(() => {
+          this.searchBlurHideTimer = null;
+          this.collapseSearch();
+        }, SEARCH_BLUR_HIDE_MS);
+      },
+
+      /** 作废待执行的失焦收起（点图标开合 / onUnload 时调用） */
+      clearSearchBlurHide() {
+        if (!this.searchBlurHideTimer) return;
+        clearTimeout(this.searchBlurHideTimer);
+        this.searchBlurHideTimer = null;
       },
 
       /** 只清空选中、保留多选模式（月份/搜索变化时用） */

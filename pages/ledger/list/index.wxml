@@ -33,6 +33,7 @@
       shape="round"
       focus="{{ searchOpen }}"
       bind:change="onSearch"
+      bind:blur="onSearchBlur"
       background="transparent"
     />
   </view>
