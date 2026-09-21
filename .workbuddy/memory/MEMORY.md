@@ -103,13 +103,20 @@
 - **铺满对齐（第四轮）**：没有「取消」按钮、没有 row 包裹层，van-search 直接铺满整行；
   根节点的左右内边距靠 `--search-padding: 0 var(--space-page)` 穿透组件继承换成页面留白令牌，
   搜索框圆角边缘正好与下方卡片对齐
-- **下滑自动收起（第四轮）**：`onPageScroll` → `onSearchScrollHide(e.scrollTop)`（两页同款），
+- **下滑自动收起（第四轮，第六轮收窄口径）**：`onPageScroll` → `onSearchScrollHide(e.scrollTop)`（两页同款），
   向下滚一次位移 > `SEARCH_SCROLL_HIDE_PX`(24px) 才收（轻微抖动/回弹不打扰，向上滚不收）；
+  ⚠️ **只在输入框为空时滚动才收**——有关键词时用户在浏览结果，滚动不收（与失焦收起同口径，
+  用户反馈"输入内容后上下滑动也隐藏"后补齐，verify 已登记守卫标记）；
   **`collapseSearch()` 只收输入行、保留关键词**——结果还在下面，清词会让列表跳回全部；
   防抖不作废（收起后照常落库，输入框与过滤一致）。实例字段 `searchLastTop`（-1=未滚过）
   必须登记进页面 Custom 接口（defineSwipeSelectPage 选项类型封闭）
-- **失焦自动收起（第五轮）**：van-search `bind:blur="onSearchBlur"` → 延迟
+  ⚠️ 定稿口径：搜索行自动隐藏只剩两个触发点且**都仅限空输入**（空着失焦 / 空着下滑超阈值）；
+  有关键词时唯一收起方式 = 再点导航栏放大镜（连词清掉）
+- **失焦自动收起（第五轮，第六轮收窄口径）**：van-search `bind:blur="onSearchBlur"` → 延迟
   `SEARCH_BLUR_HIDE_MS`(180ms) 后 `collapseSearch()`（同样只收行、保留关键词）。
+  ⚠️ **只在输入框为空时失焦才收**——有关键词时用户在浏览结果，收了输入行反而打断
+  （用户反馈后定的口径，verify 已登记禁止回归）；blur 事件 detail 即当前输入值（vant 透传），
+  用它判空可避开防抖落库延迟。
   ⚠️ 延迟是给「点导航栏图标」让路——点图标那一下 input 先 blur，立即收起则
   onToggleSearch 看到"未展开"会重新展开（一点图标反而弹开）；两处开合入口
   （onToggleSearch/closeSearch）必须先 `clearSearchBlurHide()` 作废待执行的收起；

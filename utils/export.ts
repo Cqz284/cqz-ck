@@ -3,6 +3,7 @@ import { NotesService } from '../service/notes.service';
 import { SettingsService } from '../service/settings.service';
 import { formatMoney } from './money';
 import { format, monthOf } from './date';
+import { APP_NAME } from './app-info';
 import { LedgerType, NoteKind } from '../types/models';
 
 /**
@@ -17,7 +18,7 @@ export function toText(): string {
   const s = LedgerService.summary(month);
 
   const lines: string[] = [];
-  lines.push('===== 记账记事导出 =====');
+  lines.push('===== ' + APP_NAME + '导出 =====');
   lines.push('导出时间：' + format(Date.now(), 'YYYY-MM-DD HH:mm'));
   // 结余必须带符号：支出大于收入时为负，否则导出结果会误导使用者
   lines.push('本月(' + month + ') 收入：' + formatMoney(s.income, currency));

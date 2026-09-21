@@ -3,7 +3,7 @@
 
 <view class="page" style="{{pageStyle}}">
   <view class="brand enter">
-    <view class="brand__logo">账</view>
+    <image class="brand__logo" src="{{ appLogo }}" mode="aspectFill" />
     <text class="brand__name">{{ appName }}</text>
     <text class="brand__ver">{{ versionText }}</text>
   </view>

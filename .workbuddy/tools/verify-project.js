@@ -222,6 +222,17 @@ const MARKERS = [
   ['pages/stats/index.wxml', '<page-meta page-style', '统计页 page-meta 主题变量'],
   ['pages/about/index.wxml', '<page-meta page-style', '关于页 page-meta 主题变量'],
 
+  // —— 应用品牌：名称 + Logo（2026-09-21 更名「胖鼠手账」）——
+  // ⚠️ 名称/Logo 唯一口径在 utils/app-info.ts；注意：真正的线上小程序名称与图标在
+  // 微信公众平台后台配置，代码里只能改应用内展示（我的页/关于页/导出头）
+  ['utils/app-info.ts', "export const APP_NAME = '胖鼠手账'", '应用名称唯一口径（改名改这里）'],
+  ['utils/app-info.ts', "export const APP_LOGO = '/assets/app-logo.png'", '应用 Logo 唯一口径'],
+  ['pages/profile/index.wxml', '<image class="hero__logo" src="{{ appLogo }}"', '我的页概览卡用图片 Logo'],
+  ['pages/profile/index.ts', 'appLogo: APP_LOGO,', '我的页 Logo 数据接线'],
+  ['pages/about/index.wxml', '<image class="brand__logo" src="{{ appLogo }}"', '关于页品牌区用图片 Logo'],
+  ['pages/about/index.ts', 'appLogo: APP_LOGO,', '关于页 Logo 数据接线'],
+  ['utils/export.ts', "'===== ' + APP_NAME + '导出 ====='", '导出头跟随应用名（不许写死名称）'],
+
   // —— 额度（预算）与进度条 ——
   ['utils/budget.ts', 'budgetAlertText', '额度提醒纯计算'],
   ['utils/budget.ts', 'shouldNoticeToday', '同一天只提醒一次'],

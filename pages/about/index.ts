@@ -1,12 +1,13 @@
 import { ledgerStore } from '../../store/ledger.store';
 import { notesStore } from '../../store/notes.store';
 import { StorageService } from '../../service/storage';
-import { APP_NAME, APP_VERSION_TEXT } from '../../utils/app-info';
+import { APP_NAME, APP_LOGO, APP_VERSION_TEXT } from '../../utils/app-info';
 import { LIGHT_COLORS, applyPageTheme, attachPageTheme, detachPageTheme } from '../../utils/theme';
 
 /** 页面 data */
 interface AboutData {
   appName: string;
+  appLogo: string;
   versionText: string;
   ledgerCount: number;
   noteCount: number;
@@ -25,6 +26,7 @@ interface AboutCustom {
 Page<AboutData, AboutCustom>({
   data: {
     appName: APP_NAME,
+    appLogo: APP_LOGO,
     versionText: APP_VERSION_TEXT,
     ledgerCount: 0,
     noteCount: 0,

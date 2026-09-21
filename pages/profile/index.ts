@@ -6,7 +6,7 @@ import { toText, copyToClipboard } from '../../utils/export';
 import { buildBackup, parseBackup, applyBackup } from '../../utils/backup';
 import type { BackupPayload, ParsedBackup } from '../../utils/backup';
 import { haptic } from '../../utils/haptics';
-import { APP_NAME, APP_VERSION_TEXT } from '../../utils/app-info';
+import { APP_NAME, APP_LOGO, APP_VERSION_TEXT } from '../../utils/app-info';
 import { format } from '../../utils/date';
 import { LIGHT_COLORS, applyPageTheme, attachPageTheme, detachPageTheme } from '../../utils/theme';
 
@@ -16,6 +16,7 @@ const MAX_BACKUP_FILE_BYTES = 5 * 1024 * 1024;
 /** 页面 data */
 interface ProfileData {
   appName: string;
+  appLogo: string;
   versionText: string;
   ledgerCount: number;
   noteCount: number;
@@ -45,6 +46,7 @@ interface ProfileCustom {
 Page<ProfileData, ProfileCustom>({
   data: {
     appName: APP_NAME,
+    appLogo: APP_LOGO,
     versionText: APP_VERSION_TEXT,
     ledgerCount: 0,
     noteCount: 0,

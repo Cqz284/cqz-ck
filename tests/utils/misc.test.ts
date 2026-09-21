@@ -5,6 +5,7 @@ import { uid } from '../../utils/id';
 import { debounce } from '../../utils/debounce';
 import { monthOf, dayDiff, fromNow } from '../../utils/date';
 import { toText } from '../../utils/export';
+import { APP_NAME } from '../../utils/app-info';
 import { LedgerService } from '../../service/ledger.service';
 import { NotesService } from '../../service/notes.service';
 import { LedgerType, NoteKind } from '../../types/models';
@@ -240,7 +241,7 @@ describe('export 工具', () => {
     LedgerService.create({ type: LedgerType.Expense, amount: 25.5, date: '2026-09-11', tag: '餐饮', remark: '牛肉面' });
     NotesService.create({ kind: NoteKind.Todo, content: '周报' });
     const text = toText();
-    expect(text).toContain('记账记事导出');
+    expect(text).toContain(APP_NAME + '导出');
     expect(text).toContain('工资');
     expect(text).toContain('牛肉面');
     expect(text).toContain('周报');

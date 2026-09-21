@@ -4,7 +4,7 @@
 <view class="page" style="{{pageStyle}}">
   <!-- 顶部概览：应用信息 + 三个总量，替代原先把"数据概览"做成一串 cell 的写法 -->
   <view class="hero enter enter--slow">
-    <view class="hero__logo">账</view>
+    <image class="hero__logo" src="{{ appLogo }}" mode="aspectFill" />
     <view class="hero__main">
       <text class="hero__name">{{ appName }}</text>
       <text class="hero__sub">数据保存在本机 · {{ usageText }}</text>
