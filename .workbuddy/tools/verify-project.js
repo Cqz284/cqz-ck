@@ -82,7 +82,7 @@ const MARKERS = [
   ['pages/notes/list/index.ts', 'this.onSearchScrollHide(e.scrollTop);', '记事列表滚动驱动搜索行收起（调用点）'],
   ['pages/notes/list/index.ts', 'collapseSearch() {', '记事列表滚动收起（保留关键词，方法）'],
   // 导航栏标题绝对定位居中（右侧插槽放搜索图标后，flex 流内布局会把标题挤偏）
-  ['components/navigation-bar/navigation-bar.wxss', 'top: env(safe-area-inset-top);', '导航栏标题绝对定位居中（不随左右插槽宽度偏移）'],
+  ['components/navigation-bar/navigation-bar.wxss', 'bottom: 0;\n  height: var(--height);', '导航栏标题绝对定位居中且贴底（不随左右插槽宽度偏移，也不吃状态栏高度的亏）'],
   ['components/navigation-bar/navigation-bar.wxss', 'pointer-events: none;', '标题层禁点击（否则全宽覆盖挡住右侧图标）'],
   // 统计页分类明细：常驻折叠容器 + 实测高度过渡（切换分类不跳变）
   ['pages/stats/index.wxml', 'detail-wrap', '统计明细折叠容器（height 过渡）'],
@@ -371,6 +371,10 @@ const FORBIDDEN = [
   ['behaviors/swipe-select.ts', 'this.exitTimer = null;\n      this.clearPick();', '退出多选应即时生效（共享）'],
   // 首页的记事区只放待办：普通笔记混在首页会把"要去做"和"写下来"混成一锅
   ['pages/index/index.wxml', 'recentNotes', '首页只展示待办'],
+  // 标题垂直定位：绝对定位参照是 inner 的内边距盒（top:0 = 整条栏最顶、含状态栏区），
+  // bottom 再减一个 env(safe-area-inset-top) 会把定位带整体抬高 —— 标题浮到状态栏一带、
+  // 与右侧搜索图标不在一条水平线上（2026-09-21 真机翻车）。正确写法是 bottom: 0 + height: var(--height)
+  ['components/navigation-bar/navigation-bar.wxss', 'bottom: env(safe-area-inset-top)', '导航栏标题必须贴底（bottom: 0），bottom 不吃安全区高度'],
   // "我的"页的「设置」入口不再显示右侧摘要（用户要求：不要显示文字）
   ['pages/profile/index.wxml', 'settingsSummary', '我的页设置入口不显示摘要'],
   // 主题手动切换已按用户要求移除：模型 / 默认值 / 页面都不许再出现

@@ -57,10 +57,16 @@
   background-color: var(--weui-FG-0);
 }
 
-/* 标题绝对定位居中（left/right 0 贯穿整条导航栏，上下以安全区为界）：
+/* 标题绝对定位居中（left/right 0 贯穿整条导航栏）：
    左侧返回区带固定内联宽度（leftWidth，避让胶囊的预留区），右侧插槽放搜索图标后
    左右宽度不再对称，flex 流内的 flex:1 布局会把标题挤偏 —— 绝对定位让标题
    永远以屏幕中线为准，与两侧插槽各放什么无关。
+   ⚠️ 垂直定位必须「bottom: 0 + height: var(--height)」，**不能**用
+   「top/bottom 各 env(safe-area-inset-top)」（2026-09-21 真机翻车：标题浮到状态栏一带、
+   与右侧图标不在一条水平线上）。原因：绝对定位的参照是 inner 的**内边距盒** ——
+   top: 0 是整条栏的最顶（含状态栏区），bottom: 0 是栏底；而导航内容带（--height）
+   在 padding-top 之后的**贴底**位置。bottom 再减一个状态栏高，定位带就被整体抬高。
+   贴底 + 固定高对两条内边距路径都成立：iOS 走 env()、安卓/工具走 safeAreaTop 内联 px。
    ⚠️ pointer-events: none 必须加：center 全宽覆盖在 right 之上，
    不禁用会挡住右侧插槽里搜索图标的点击（本项目 center 只放纯文本标题）。 */
 .weui-navigation-bar__center {
@@ -69,8 +75,8 @@
   position: absolute;
   left: 0;
   right: 0;
-  top: env(safe-area-inset-top);
-  bottom: env(safe-area-inset-top);
+  bottom: 0;
+  height: var(--height);
   display: flex;
   flex-direction: row;
   align-items: center;
