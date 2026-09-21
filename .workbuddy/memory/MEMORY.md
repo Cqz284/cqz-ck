@@ -108,6 +108,12 @@
   **`collapseSearch()` 只收输入行、保留关键词**——结果还在下面，清词会让列表跳回全部；
   防抖不作废（收起后照常落库，输入框与过滤一致）。实例字段 `searchLastTop`（-1=未滚过）
   必须登记进页面 Custom 接口（defineSwipeSelectPage 选项类型封闭）
+- **失焦自动收起（第五轮）**：van-search `bind:blur="onSearchBlur"` → 延迟
+  `SEARCH_BLUR_HIDE_MS`(180ms) 后 `collapseSearch()`（同样只收行、保留关键词）。
+  ⚠️ 延迟是给「点导航栏图标」让路——点图标那一下 input 先 blur，立即收起则
+  onToggleSearch 看到"未展开"会重新展开（一点图标反而弹开）；两处开合入口
+  （onToggleSearch/closeSearch）必须先 `clearSearchBlurHide()` 作废待执行的收起；
+  实例字段 `searchBlurHideTimer` 同样要登记进 Custom 接口，onUnload 清理
 - `closeSearch()`（图标再点）收起时**必须先 `commitSearch.cancel()`** 再清词刷新
   （否则防抖还会把关键词写回来）。搜索语义不变：限当月（记账）、跟随页签/标签（记事）
 - 经验教训：**给低频功能配复杂手势（下拉跟手/吸附）性价比极低**——动效要求越高、失败面越大；
