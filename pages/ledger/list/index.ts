@@ -210,8 +210,7 @@ Page<LedgerListData, LedgerListCustom>(
           this.setData({ undoVisible: false });
         }
         this.refresh();
-        // 搜索栏回到隐藏态（带着关键词回来则保持露出）；内容短到不能滚动时，
-        // refresh 里的长度检查会立刻把它重新常驻露出
+        // 搜索栏回到隐藏态（带着关键词回来则保持露出）
         this.resetSearchReveal();
         // 切页**不**收口（2026-09-21 定稿）：滑开的删除块跨页保留原样，"就不动它"。
         // 之前的"切页时宽度归零→还原"正是"快速切页后那一行滑不动"的根源，已整个移除；
@@ -301,8 +300,6 @@ Page<LedgerListData, LedgerListCustom>(
             })
           );
         }
-        // 内容长度变了：短到不能滚动时让搜索栏常驻（否则用户永远做不出"下拉"把它拉出来）
-        this.checkSearchRevealFit();
       },
 
       /**

@@ -112,13 +112,21 @@
   就收不到"手指落在卡片上"的 move，而贴顶下拉恰好全落在卡片上。`top` 要在 touchmove 里**现读**
   `searchLastTop`（不能用 touchstart 快照：中部拉回顶部时手指还没松）；接管判定惰性放在 touchmove
   （要接"从中部一路拉回顶部"的手势，dy 只从贴顶那一帧起算，位移才不会突变）
-- `onSearchTouchEnd` 的**回弹一支不走 `hideSearch`**：会被"正在使用/不可滚动"拦下 → 位移卡在半路。
-  唯一例外：`searchUnscrollable` 时回弹成露出（也是常驻栏被多选态藏起来后唯一能找回的路径）
+- `onSearchTouchEnd` 的**回弹一支不走 `hideSearch`**：它会被"正在使用（有输入 / 聚焦）"拦下 →
+  位移卡在半路（手指已松、内容卡中间）。回弹只表达"这段手势没拉够"
 - **不用 enablePullDownRefresh**（会带微信原生转圈，且整页下移回弹 + 搜索栏撑开是双重位移）
 - 槽位高度用确定值：app.wxss 的 `--search-slot-h` ↔ `utils/search-reveal.ts` 的 `SEARCH_SLOT_HEIGHT_RPX`
-  必须同步（JS 要用它判断"内容能不能滚动"与"拉出量过没过吸附门槛"）
-- **内容短到不能滚动时搜索栏常驻**（否则用户永远做不出"下拉"这个动作）：`checkSearchRevealFit()` 在
-  refresh 末尾调用；比较时**减掉搜索栏自身占位**（否则"撑开→能滚动→收起→又不能滚动"振荡），另有 24px 余量
+  必须同步（JS 要用它换算 px 判"拉出量过没过吸附门槛"）
+- ⚠️ **收起态靠裁切：视口外是"裁切线"不是坐标**（2026-09-21 真机翻车：进页搜索栏就存在、闲置也不隐藏）。
+  本项目 navigationStyle: custom + **流内的** `<navigation-bar>` → **.page 上方不是视口外、而是导航栏那一条**，
+  搜索栏绝对定位到 .pull 上方一个槽位高正好落进去 → 一直可见（还压住标题），位移归零也隐藏不掉。
+  修法：两页 `.page { overflow: hidden }`（裁切线 = .page 顶边）+ **顶部留白从 .page 下移到 .pull 的
+  padding-top**（让 .pull 顶边与裁切线重合；留白挂回 .page 会露出一个留白高的尾巴）。
+  裁切容器不能与位移容器合并（overflow 的裁切矩形跟着自身 transform 走，等于没裁）
+- **"内容短到不能滚动就常驻露出"已删除**（2026-09-21）：它与"正常是隐藏状态"直接冲突；而且跟手版的下拉
+  走**触摸**事件、不依赖能不能滚动，短列表照样拉得出来 → 例外没有存在理由。
+  `searchFitsViewport` / `checkSearchRevealFit` / `searchUnscrollable` / `SEARCH_FIT_SLACK_PX` 全删净
+  （verify 已登记禁止回归）。**搜索栏任何内容长度都默认隐藏、闲置都会收起**
 - 编排接入方式：页面选项里 `...searchRevealMixin`（带 ThisType 的对象字面量），页面 Custom 接口 extends
   `SearchRevealFields, SearchRevealMethods`。**别用 Object.assign**（丢 this 类型），也不必改
   defineSwipeSelectPage 签名

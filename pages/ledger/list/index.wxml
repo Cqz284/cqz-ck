@@ -18,8 +18,11 @@
   <!--
     .pull 是「跟手下拉」的位移容器：JS 把当前位移拼成内联 style 写在它上面
     （transform: translate3d(0, <位移>px, 0); transition: <none | 吸附曲线>）。
-    搜索栏绝对定位在它**上方**一个槽位高处，所以位移为 0 时完全在视口之外（不占位、不可点），
-    手指下拉多少它就从上方滑进来多少 —— 编排在 behaviors/search-reveal.ts，样式在 app.wxss。
+    搜索栏绝对定位在它**上方**一个槽位高处，位移为 0 时整条落在 .page 的顶边之上 ——
+    那一带不是视口外，而是**自定义导航栏占的那一条**（本项目 navigationStyle: custom，
+    <navigation-bar> 是流内节点），所以必须靠 .page 的 overflow: hidden 把它裁掉才算隐藏；
+    手指下拉多少它就从裁切线下方滑进来多少 —— 编排在 behaviors/search-reveal.ts，
+    样式（含裁切与顶部留白为何在 .pull 上）见 app.wxss。
     注意：.pull 上的 transform 会给后代创建包含块，页面里不能有依赖它定位的 fixed 元素
     （fab / 多选操作条 / 撤销条都在 .page 之外，安全）。
   -->

@@ -55,22 +55,30 @@ const MARKERS = [
   ['pages/notes/list/index.ts', 'onPageScroll(e: { scrollTop: number })', '记事列表滚动入口（收口 + 搜索栏显隐）'],
   ['pages/notes/list/index.ts', 'this.closeSwipesOnScroll();', '记事列表滚动时收回滑开的行（调用点）'],
   // 顶部搜索栏「下拉露出 / 自动收起」（2026-09-21 定稿，编排在 behaviors/search-reveal.ts）：
-  // 默认隐藏、下拉露出、往下翻或空闲 5s 收回；内容短到不能滚动时常驻（否则永远拉不出来）
+  // 默认隐藏、下拉露出、往下翻或空闲 5s 收回。"短列表常驻"那条例外已删除（2026-09-21）：
+  // 它与"正常是隐藏状态"直接冲突；而且跟手版的下拉走**触摸**事件、不依赖页面能不能滚动，
+  // 短列表照样拉得出来 —— 例外没有存在理由，留着只会让搜索栏在某些页面上永远挂着。
   ['utils/search-reveal.ts', 'export function searchScrollIntent(', '滚动方向 → 显隐意图（纯函数）'],
-  ['utils/search-reveal.ts', 'export function searchFitsViewport(', '内容能否滚动（纯函数）'],
   ['behaviors/search-reveal.ts', 'export const searchRevealMixin', '搜索栏显隐编排（摊进页面选项）'],
   ['behaviors/search-reveal.ts', 'onPageScrollSearch(scrollTop: number) {', '滚动驱动露出/收起（方法）'],
-  ['behaviors/search-reveal.ts', 'checkSearchRevealFit() {', '内容短到不能滚动时常驻露出（方法）'],
   ['behaviors/search-reveal.ts', 'resetSearchReveal() {', '页面显示时复位（方法）'],
   ['behaviors/swipe-select.ts', 'hideSearchIfShown?.();', '进多选顺手收起搜索栏（可选钩子）'],
   ['pages/ledger/list/index.ts', '...searchRevealMixin,', '记账列表摊入搜索栏编排'],
   ['pages/ledger/list/index.ts', 'this.onPageScrollSearch(e.scrollTop);', '记账列表滚动驱动搜索栏（调用点）'],
-  ['pages/ledger/list/index.ts', 'this.checkSearchRevealFit();', '记账列表刷新后校准能否滚动（调用点）'],
   ['pages/ledger/list/index.ts', 'this.resetSearchReveal();', '记账列表显示时复位搜索栏（调用点）'],
   ['pages/notes/list/index.ts', '...searchRevealMixin,', '记事列表摊入搜索栏编排'],
   ['pages/notes/list/index.ts', 'this.onPageScrollSearch(e.scrollTop);', '记事列表滚动驱动搜索栏（调用点）'],
-  ['pages/notes/list/index.ts', 'this.checkSearchRevealFit();', '记事列表刷新后校准能否滚动（调用点）'],
   ['pages/notes/list/index.ts', 'this.resetSearchReveal();', '记事列表显示时复位搜索栏（调用点）'],
+  // 收起态的"视口外"靠裁切拿到（2026-09-21 真机反馈"进页搜索栏就存在、闲置也不隐藏"）：
+  // 自定义导航栏（navigationStyle: custom + 流内的 <navigation-bar>）之下，.page 上方不是视口外、
+  // 而是导航栏那一条 —— 搜索栏绝对定位到 .pull 上方一个槽位高时正好落在里面，一直可见，
+  // 位移归零也隐藏不掉（归零只是回到同一个可见位置）。
+  // 所以两页的 .page 必须 overflow: hidden（裁切线 = .page 顶边），且顶部留白下移到 .pull 的
+  // padding-top —— 让 .pull 的顶边与裁切线重合，否则搜索栏会露一个留白高的尾巴。
+  ['pages/ledger/list/index.wxss', 'overflow: hidden;', '记账列表 .page 裁切收起态搜索栏'],
+  ['pages/ledger/list/index.wxss', '.pull {\n  padding-top: var(--space-page);', '记账列表顶部留白在 .pull（=裁切线）'],
+  ['pages/notes/list/index.wxss', 'overflow: hidden;', '记事列表 .page 裁切收起态搜索栏'],
+  ['pages/notes/list/index.wxss', '.pull {\n  padding-top: var(--space-page);', '记事列表顶部留白在 .pull（=裁切线）'],
   ['pages/ledger/list/index.wxml', 'class="pull" style="{{ searchPullStyle }}"', '记账列表跟手位移容器（调用点）'],
   ['pages/ledger/list/index.wxml', 'bind:focus="onSearchFocus"', '记账列表搜索栏聚焦事件（聚焦中不收起）'],
   ['pages/notes/list/index.wxml', 'class="pull" style="{{ searchPullStyle }}"', '记事列表跟手位移容器（调用点）'],
@@ -403,7 +411,7 @@ const FORBIDDEN = [
   // 浅色主题下记录卡失去立体感（2026-09-21 用户反馈）；裁剪只在 --out 收起动画时需要
   ['app.wxss', '.row-collapse {\n  overflow: hidden;', '行收起容器平时不裁剪阴影'],
   // 搜索栏不许退回"高度撑开"（.search-slot--on / height 过渡）：那条路把搜索框压扁着展开，
-  // 也给不出跟手感。现在收起态是位移 0（栏子停在 .pull 上方一个槽位高处，完全在视口外），
+  // 也给不出跟手感。现在收起态是位移 0（栏子停在 .pull 上方一个槽位高处，被 .page 裁掉），
   // 露出靠 .pull 的 translate3d 跟随手指 —— 谁把高度过渡加回来就会复现"拉到阈值才整体弹出"。
   ['pages/ledger/list/index.wxml', 'search-slot--on', '搜索栏不再用高度撑开，改跟手位移'],
   ['pages/notes/list/index.wxml', 'search-slot--on', '搜索栏不再用高度撑开，改跟手位移'],
@@ -411,6 +419,15 @@ const FORBIDDEN = [
   // wx:if 会让搜索栏没有过渡、且改变节点数（出场瞬间内容跳位）
   ['pages/ledger/list/index.wxml', 'wx:if="{{ searchShown }}"', '搜索栏不用 wx:if 控制显隐'],
   ['pages/notes/list/index.wxml', 'wx:if="{{ searchShown }}"', '搜索栏不用 wx:if 控制显隐'],
+  // 列表页 .page 的顶部留白必须留在 .pull 上（2026-09-21）：留白回到 .page 会把 .pull 的顶边
+  // 推离裁切线，收起态的搜索栏就会露出一个留白高的尾巴 —— 即用户报的"进页搜索栏就存在"。
+  ['pages/ledger/list/index.wxss', 'padding: var(--space-page) 0 340rpx;', '记账列表 .page 顶部留白已下移到 .pull（=裁切线）'],
+  ['pages/notes/list/index.wxss', 'padding: var(--space-page) 0 340rpx;', '记事列表 .page 顶部留白已下移到 .pull（=裁切线）'],
+  // "内容短到不能滚动就常驻露出"那条例外已删除（2026-09-21）：它与"正常是隐藏状态"直接冲突，
+  // 而且跟手版的下拉走触摸事件、不依赖页面能不能滚动 —— 谁把测量常驻加回来，搜索栏又会在
+  // 短列表上永远挂着、空闲也不收。
+  ['behaviors/search-reveal.ts', 'checkSearchRevealFit', '短列表常驻已删除：搜索栏任何内容长度都默认隐藏'],
+  ['utils/search-reveal.ts', 'searchFitsViewport', '同上：不再用测量内容高度决定常驻'],
 ];
 
 /** 排除目录（与 project.config.json 的 packOptions.ignore 思路一致） */

@@ -48,14 +48,6 @@ export const SEARCH_REVEAL_TOP_PX = 150;
 /** 方向判定阈值（px）：小于它的位移当抖动，不翻转显隐 */
 export const SEARCH_DIRECTION_EPS = 8;
 
-/**
- * "能滚动"的判定余量（px）
- *
- * 内容只比视口高几个像素时，滚动范围还不到方向阈值（SEARCH_DIRECTION_EPS），
- * 用户根本做不出一次"下拉"→ 搜索栏会永远拉不出来。所以高出这点以内也算"不能滚动"。
- */
-export const SEARCH_FIT_SLACK_PX = 24;
-
 /** 滚动一次之后的显隐意图 */
 export type SearchRevealIntent = 'show' | 'hide' | 'none';
 
@@ -98,30 +90,6 @@ export function searchScrollIntent(o: ScrollIntentOptions): SearchRevealIntent {
     return top <= nearTop ? 'show' : 'none';
   }
   return o.shown ? 'hide' : 'none';
-}
-
-/**
- * 内容是否短到不能滚动
- *
- * 不能滚动 = 用户永远做不出"下拉"这个动作 → 搜索栏必须常驻，否则再也拉不出来。
- * 比较时**减掉搜索栏自身占的高度**（`shown` 时它已经撑开了），
- * 否则会出现"撑开 → 变得能滚动 → 收起 → 又不能滚动"的死循环。
- *
- * @param contentHeight 内容总高（px，含当前已撑开的搜索栏）
- * @param windowHeight 可视区高（px）
- * @param slotHeight 搜索栏占位高度（px）
- * @param shown 搜索栏当前是否露出
- * @returns 是否不能滚动
- */
-export function searchFitsViewport(
-  contentHeight: number,
-  windowHeight: number,
-  slotHeight: number,
-  shown: boolean
-): boolean {
-  if (!(contentHeight > 0) || !(windowHeight > 0)) return false;
-  const base = contentHeight - (shown ? slotHeight : 0);
-  return base <= windowHeight + SEARCH_FIT_SLACK_PX;
 }
 
 /* ===== 贴顶下拉：跟手位移 + 松手吸附 =====

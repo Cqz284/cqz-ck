@@ -1,8 +1,20 @@
 /* .page 骨架、.swipe-act（左滑/右滑操作块）、.fab、.enter / .row-collapse 已在 app.wxss 中统一定义，此处只保留本页差异 */
 
+/*
+  ⚠️ 顶部留白（--space-page）挂在 .pull 上、**不挂回 .page**（2026-09-21 修"进页搜索栏就存在、
+  闲置也不隐藏"）：搜索栏收起时停在 .pull 顶边上方一个槽位高处，靠 .page 的 overflow: hidden
+  裁掉才算真隐藏（本项目是自定义导航栏，.page 上方不是视口外、而是导航栏那一条）。
+  裁切线就是 .page 的顶边，所以 .pull 的顶边必须与它重合 —— 顶部留白因此下移到 .pull 的
+  padding-top。留白挂回 .page 的话 .pull 顶边被推离裁切线，搜索栏会露出一个留白高的尾巴。
+*/
 .page {
-  /* 底部多留 120rpx：给多选操作条 / 撤销条留出空间 */
-  padding: var(--space-page) 0 340rpx;
+  /* 底部多留 340rpx：给多选操作条 / 撤销条留出空间 */
+  padding: 0 0 340rpx;
+  overflow: hidden;
+}
+
+.pull {
+  padding-top: var(--space-page);
 }
 
 .list {

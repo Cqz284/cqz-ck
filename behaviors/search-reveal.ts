@@ -17,6 +17,13 @@
  * 这套"拖动中 none / 松手后过渡"的机制与 Vant swipe-cell 的跟手左滑完全一致
  * （它也是把 transform 与 transition 拼进同一个 wrapperStyle）。
  *
+ * ⚠️ 收起必须靠**裁切**（2026-09-21 真机反馈"进页搜索栏就存在、闲置也不隐藏"）：
+ * 本项目是自定义导航栏（app.json 的 navigationStyle: custom，页面里的 <navigation-bar> 是
+ * **流内**节点、不是 fixed），所以 .page 的上方不是视口外、而正是**导航栏那一条** ——
+ * 搜索栏绝对定位到 .pull 上方一个槽位高时正好落在里面，一直可见，位移归零也隐藏不掉。
+ * 所以两个列表页的 .page 上必须带 `overflow: hidden`（裁切线 = .page 顶边 = .pull 的顶边），
+ * 顶部留白相应下移到 .pull 的 padding-top —— 详见 app.wxss 里 .search-slot 那一段的说明。
+ *
  * 宿主页面的约定（缺了不会报错，但行为会不对）：
  * - data 里有 `keyword`：非空视为"正在使用"，不自动收起
  * - data 里有 `selecting`（由 swipe-select 提供）：多选态强制收起
@@ -30,7 +37,6 @@
  * - 页面根节点挂 `capture-bind:touchstart/touchmove/touchend/touchcancel="onSearchTouch*"`
  *   ⚠️ 必须是 **capture-bind**：van-swipe-cell 拖动中会在自己节点上 catchtouchmove
  *   阻断冒泡，冒泡阶段的监听收不到"手指落在卡片上"的那部分事件（贴顶下拉正好全在卡片上）
- * - refresh 之后调 `checkSearchRevealFit()`（内容短到不能滚动时要让搜索栏常驻）
  * - onUnload 调 `clearSearchTimer()`
  *
  * 判定全在 utils/search-reveal.ts（纯函数、有单测），这里只管编排与副作用。
@@ -44,7 +50,6 @@ import {
   SEARCH_SLOT_HEIGHT_RPX,
   pullOffsetFromDrag,
   pullSnapTarget,
-  searchFitsViewport,
   searchScrollIntent,
 } from '../utils/search-reveal';
 
@@ -69,8 +74,6 @@ export interface SearchRevealFields {
   searchIdleTimer: ReturnType<typeof setTimeout> | null;
   /** 输入框是否聚焦（聚焦中不自动收起，否则用户打字打到一半栏子会跑掉） */
   searchFocused: boolean;
-  /** 内容短到不能滚动（此时搜索栏常驻：不能滚动就永远做不出"下拉"这个动作） */
-  searchUnscrollable: boolean;
   /** 当前实际位移（px）：data.searchPullStyle 的真值来源，跟手期间逐帧更新 */
   searchPullOffset: number;
   /** 跟手手势的起点 clientY（px）；null = 这一路输入未接管 */
@@ -102,7 +105,7 @@ export interface SearchRevealMethods {
   showSearch(): void;
   /** 按"是否正在使用"决定是否收起（滚动向下、空闲超时走这里） */
   hideSearch(): void;
-  /** 强制收起（忽略"正在使用"与"不可滚动"，用于多选态 / 切页复位） */
+  /** 强制收起（忽略"正在使用"，用于多选态 / 切页复位） */
   hideSearchIfShown(): void;
   /** 输入框获得焦点（暂停自动收起） */
   onSearchFocus(): void;
@@ -112,8 +115,6 @@ export interface SearchRevealMethods {
   syncSearchKeyword(keyword: string): void;
   /** 页面显示时复位（回到隐藏态；带关键词回来则保持露出） */
   resetSearchReveal(): void;
-  /** 内容短到不能滚动时让搜索栏常驻（refresh 之后调用） */
-  checkSearchRevealFit(): void;
   /** 取消空闲计时器（onUnload 调用） */
   clearSearchTimer(): void;
 }
@@ -185,7 +186,6 @@ export const searchRevealMixin: SearchRevealMixin & ThisType<SearchRevealSelf> =
   searchLastTop: 0,
   searchIdleTimer: null,
   searchFocused: false,
-  searchUnscrollable: false,
   searchPullOffset: 0,
   searchTouchY: null,
   searchPullLastY: 0,
@@ -230,7 +230,7 @@ export const searchRevealMixin: SearchRevealMixin & ThisType<SearchRevealSelf> =
    */
   onSearchTouchMove(e: SearchTouchEvent) {
     const self = this;
-    // 已露出（含常驻）/ 多选态：没有"再跟手拉出来"这回事
+    // 已露出 / 多选态：没有"再跟手拉出来"这回事
     if (self.data.searchShown || self.data.selecting) {
       self.searchTouchY = null;
       return;
@@ -266,11 +266,9 @@ export const searchRevealMixin: SearchRevealMixin & ThisType<SearchRevealSelf> =
    *
    * 速度优先 —— 甩动比"拉到哪"更能表达意图；都没甩再看拉出量过没过门槛。
    *
-   * 回弹这一支**刻意不走 hideSearch**：它会被"正在使用 / 不可滚动"拦下，那样位移就停在
-   * 半路（手指已经松开、内容却卡在中间）。回弹只表达"这段手势没拉够"，与那两种状态无关 ——
-   * 需要常驻的场景在跟手入口就被拦下了（`searchShown` 为真时不接管手势）。
-   * 唯一的例外是"不能滚动"：那种列表里搜索栏本就该常驻，回弹成露出才自洽
-   * （也是"多选态把常驻栏藏起来后"唯一能把它找回来的路径）。
+   * 回弹这一支**刻意不走 hideSearch**：它会被"正在使用"拦下，那样位移就停在半路
+   * （手指已经松开、内容却卡在中间）。回弹只表达"这段手势没拉够"，与"有关键词"无关 ——
+   * 该不该跟手已经在入口拦下了（`searchShown` 为真时不接管手势）。
    */
   onSearchTouchEnd() {
     const self = this;
@@ -285,10 +283,6 @@ export const searchRevealMixin: SearchRevealMixin & ThisType<SearchRevealSelf> =
     });
     if (target === 'open') {
       self.showSearch();
-      return;
-    }
-    if (self.searchUnscrollable) {
-      self.applyPullOffset(slot, true);
       return;
     }
     self.applyPullOffset(0, false);
@@ -308,8 +302,6 @@ export const searchRevealMixin: SearchRevealMixin & ThisType<SearchRevealSelf> =
 
   hideSearch() {
     const self = this;
-    // 内容短到不能滚动：必须常驻，否则用户再也做不出"下拉"来把它拉出来
-    if (self.searchUnscrollable) return;
     // 正在使用（有输入 / 聚焦中）：不动它，免得把生效中的筛选藏起来
     if (self.data.keyword || self.searchFocused) return;
     self.hideSearchIfShown();
@@ -370,36 +362,6 @@ export const searchRevealMixin: SearchRevealMixin & ThisType<SearchRevealSelf> =
     // 带着关键词切页往返：保持露出（藏起来会让用户不知道列表被筛过）
     if (self.data.keyword) return;
     self.hideSearchIfShown();
-  },
-
-  checkSearchRevealFit() {
-    const self = this;
-    const query = typeof wx !== 'undefined' && typeof wx.createSelectorQuery === 'function'
-      ? wx.createSelectorQuery()
-      : null;
-    if (!query) return;
-    query
-      .selectViewport()
-      .scrollOffset((res) => {
-        const info = res as { scrollHeight?: number } | null;
-        const contentHeight = info && typeof info.scrollHeight === 'number' ? info.scrollHeight : 0;
-        let windowHeight = 0;
-        try {
-          if (typeof wx !== 'undefined' && typeof wx.getWindowInfo === 'function') {
-            windowHeight = wx.getWindowInfo().windowHeight || 0;
-          }
-        } catch {
-          windowHeight = 0;
-        }
-        const fit = searchFitsViewport(contentHeight, windowHeight, slotHeightPx(), !!self.data.searchShown);
-        // 只在结论翻转时动一次：测量本身会随栏子尺寸变化，边界上反复翻会看着发抖
-        if (fit === self.searchUnscrollable) return;
-        self.searchUnscrollable = fit;
-        // 常驻时走 applyPullOffset 而不是 showSearch：常驻不需要"空闲自动收起"那套计时
-        if (fit) self.applyPullOffset(slotHeightPx(), true);
-        else self.hideSearch();
-      })
-      .exec();
   },
 
   clearSearchTimer() {

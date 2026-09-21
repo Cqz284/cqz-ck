@@ -13,8 +13,8 @@ import { COLLAPSE_DURATION_MS } from '../../utils/motion';
 import { measureHeights } from '../../utils/motion';
 import { resetHints } from '../../utils/hint';
 
-// measureHeights 依赖 wx.createSelectorQuery（jest.setup 未 mock），
-// 这里替换成可编程的桩：不影响 COLLAPSE_DURATION_MS 等常量的真实值。
+// measureHeights 依赖 wx.createSelectorQuery，这里替换成可编程的桩：
+// 不影响 COLLAPSE_DURATION_MS 等常量的真实值。
 jest.mock('../../utils/motion', () => {
   const actual = jest.requireActual('../../utils/motion');
   return { ...actual, measureHeights: jest.fn() };

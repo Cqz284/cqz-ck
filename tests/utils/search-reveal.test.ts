@@ -2,16 +2,17 @@
  * 顶部搜索栏「跟手下拉 · 松手吸附 · 自动收起」的测试
  *
  * 两层：
- * 1) utils/search-reveal.ts —— 纯判定（跟手位移映射、吸附目标、方向、能否滚动），无副作用
+ * 1) utils/search-reveal.ts —— 纯判定（跟手位移映射、吸附目标、方向），无副作用
  * 2) behaviors/search-reveal.ts —— 编排（setData、空闲定时器、手势采样）
  *
- * 钉住的口径（2026-09-21 第二轮定稿，对齐微信聊天列表顶部搜索框）：
+ * 钉住的口径（2026-09-21 定稿，对齐微信聊天列表顶部搜索框）：
  * - 手指下拉多少、内容就下移多少（1:1，只差一个固定的激活死区）
  * - 拉过槽位高度后进入阻尼段；松手按「甩动速度优先，其次拉出量」吸附到全开或回弹
  * - 往下翻立即收起；露出后无操作 5s 也收起
  * - 有输入 / 聚焦中不收（别把生效中的筛选藏起来）
  * - 多选态一律收起（搜索与多选是两套操作）
- * - 内容短到不能滚动时搜索栏常驻（否则用户永远做不出"下拉"这个动作）
+ * - 进页 / 切回一律回到隐藏态，且**任何内容长度都按同一套规则**：旧版那条"内容短到不能滚动
+ *   就常驻露出"的例外已删除（对应真机反馈"进页搜索栏就存在、闲置也不隐藏"），理由见最后一组测试
  */
 import {
   PULL_ACTIVATE_PX,
@@ -25,7 +26,6 @@ import {
   SEARCH_REVEAL_TOP_PX,
   pullOffsetFromDrag,
   pullSnapTarget,
-  searchFitsViewport,
   searchScrollIntent,
 } from '../../utils/search-reveal';
 import { searchRevealData, searchRevealMixin } from '../../behaviors/search-reveal';
@@ -127,33 +127,6 @@ describe('search-reveal · pullSnapTarget（松手吸附）', () => {
     expect(pullSnapTarget({ offset: 100, velocity: 0, slotHeight: 0 })).toBe('close');
     expect(() => pullSnapTarget({ offset: NaN, velocity: NaN, slotHeight: NaN })).not.toThrow();
     expect(pullSnapTarget({ offset: NaN, velocity: NaN, slotHeight: SLOT })).toBe('close');
-  });
-});
-
-describe('search-reveal · searchFitsViewport', () => {
-  const WINDOW_H = 667;
-
-  test('减掉搜索栏自身占位再比较：撑开/收起不会来回翻', () => {
-    // 内容 700px（含已撑开的 48）→ 基础内容 652 < 667 → 判定"不能滚动"
-    expect(searchFitsViewport(700, WINDOW_H, SLOT, true)).toBe(true);
-    // 去掉搜索栏后同样的 700（说明现在没撑开）→ 700 > 667 → 能滚动
-    expect(searchFitsViewport(700, WINDOW_H, SLOT, false)).toBe(false);
-    // 关键：不能出现"撑开 → 能滚动 → 收起 → 又不能滚动"的振荡
-    expect(searchFitsViewport(700, WINDOW_H, SLOT, true)).toBe(
-      searchFitsViewport(700 - SLOT, WINDOW_H, SLOT, false)
-    );
-  });
-
-  test('量不到高度（0）时不改判定', () => {
-    expect(searchFitsViewport(0, WINDOW_H, SLOT, false)).toBe(false);
-    expect(searchFitsViewport(700, 0, SLOT, false)).toBe(false);
-  });
-
-  test('只比视口高一点点也算"不能滚动"：那点滚动范围做不出一次下拉', () => {
-    // 680 > 667，但只高 13px，用户滚一下就到头、根本触发不了露出
-    expect(searchFitsViewport(680, WINDOW_H, SLOT, false)).toBe(true);
-    // 高出余量之外才算能滚动
-    expect(searchFitsViewport(WINDOW_H + 25, WINDOW_H, SLOT, false)).toBe(false);
   });
 });
 
@@ -303,15 +276,6 @@ describe('search-reveal · 编排', () => {
     expect(data.searchPullStyle).not.toContain('transition: none');
   });
 
-  test('列表不能滚动时：手势结束保持常驻（那里没有"收起"这个状态）', () => {
-    const { host, data } = makeHost();
-    host.searchUnscrollable = true; // 常驻栏被多选态藏起来后的状态
-    dragTo(host, 10);
-    host.onSearchTouchEnd();
-    expect(data.searchShown).toBe(true);
-    expect(host.searchPullOffset).toBe(SLOT);
-  });
-
   test('跟手到一半被外部接管：位移归位、残留手势被丢弃', () => {
     const { host } = makeHost();
     dragTo(host, 30, 16);
@@ -441,39 +405,23 @@ describe('search-reveal · 编排', () => {
     expect(b.data.searchShown).toBe(true);
   });
 
-  test('内容短到不能滚动 → 常驻露出；变长后退回"可收起"并计时', () => {
+  test('任何内容长度都按同一套规则：进页即隐藏，下拉仍能露出、超时照样收起', () => {
+    // 旧版有条"内容短到不能滚动就常驻露出"的例外（那时露出靠 onPageScroll 的方向判定 ——
+    // 不能滚动 = 永远做不出"下拉"）。跟手版的下拉走触摸事件，短列表照样拉得出来 → 例外已删除：
+    // 留着它，搜索栏会在短列表上一直挂着、连空闲也不收，就是用户报的"进页就存在、闲置也不隐藏"。
     const { host, data } = makeHost();
-    const mockQuery = (scrollHeight: number) => {
-      (globalThis as unknown as { wx: { createSelectorQuery: () => unknown } }).wx.createSelectorQuery = () => ({
-        selectViewport() {
-          return this;
-        },
-        scrollOffset(cb: (r: { scrollHeight: number }) => void) {
-          cb({ scrollHeight });
-          return this;
-        },
-        exec() {
-          return this;
-        },
-      });
-    };
-
-    // 内容 600 < 可视 667（无搜索栏占位）→ 不能滚动
-    mockQuery(600);
-    host.checkSearchRevealFit();
-    expect(host.searchUnscrollable).toBe(true);
-    expect(data.searchShown).toBe(true);
-
-    // 常驻期间：空闲超时 / 往下翻 / 抬手都不该把它收掉（收掉就再也拉不出来）
-    host.onPageScrollSearch(400);
-    host.onSearchTouchEnd();
-    jest.advanceTimersByTime(SEARCH_IDLE_HIDE_MS * 2);
-    expect(data.searchShown).toBe(true);
-
-    // 内容变长（能滚动）→ 交回给"下拉露出"的规则，并立刻收起
-    mockQuery(3000);
-    host.checkSearchRevealFit();
-    expect(host.searchUnscrollable).toBe(false);
     expect(data.searchShown).toBe(false);
+    expect(host.searchPullOffset).toBe(0);
+
+    // 短列表：onPageScroll 不会触发（scrollTop 恒 0），贴顶下拉照样能把它拉出来
+    dragTo(host, 60, 16);
+    host.onSearchTouchEnd();
+    expect(data.searchShown).toBe(true);
+    expect(host.searchPullOffset).toBe(SLOT);
+
+    // 露出后无操作，照样自动收起（不再有"常驻"这回事）
+    jest.advanceTimersByTime(SEARCH_IDLE_HIDE_MS);
+    expect(data.searchShown).toBe(false);
+    expect(host.searchPullOffset).toBe(0);
   });
 });
