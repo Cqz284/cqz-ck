@@ -71,19 +71,28 @@ const MARKERS = [
   ['pages/notes/list/index.ts', 'this.onPageScrollSearch(e.scrollTop);', '记事列表滚动驱动搜索栏（调用点）'],
   ['pages/notes/list/index.ts', 'this.checkSearchRevealFit();', '记事列表刷新后校准能否滚动（调用点）'],
   ['pages/notes/list/index.ts', 'this.resetSearchReveal();', '记事列表显示时复位搜索栏（调用点）'],
-  ['pages/ledger/list/index.wxml', 'class="search-slot {{ searchShown', '记账列表搜索栏显隐容器'],
+  ['pages/ledger/list/index.wxml', 'class="pull" style="{{ searchPullStyle }}"', '记账列表跟手位移容器（调用点）'],
   ['pages/ledger/list/index.wxml', 'bind:focus="onSearchFocus"', '记账列表搜索栏聚焦事件（聚焦中不收起）'],
-  ['pages/notes/list/index.wxml', 'class="search-slot {{ searchShown', '记事列表搜索栏显隐容器'],
+  ['pages/notes/list/index.wxml', 'class="pull" style="{{ searchPullStyle }}"', '记事列表跟手位移容器（调用点）'],
   ['pages/notes/list/index.wxml', 'bind:focus="onSearchFocus"', '记事列表搜索栏聚焦事件（聚焦中不收起）'],
-  // 贴顶下拉补位（2026-09-21）：页面已在顶部时 scrollTop 恒为 0，onPageScroll 拿不到
-  // "到顶后继续拖"的位移（进页直接下拉永远没反应），靠触摸位移补一路。
+  // 顶部搜索栏「跟手下拉 · 松手吸附」（2026-09-21 第二轮定稿，对齐微信聊天列表顶部搜索框）：
+  // 搜索栏绝对定位在 .pull 上方一个槽位高 → 手指下拉多少 .pull 就下移多少（1:1），
+  // 拉过槽位高进阻尼段；松手按「速度优先、其次拉出量」吸附到全开或回弹。
+  // 位移与 transition 必须拼进**同一次** setData（跟手中 transition: none），
+  // 拆成两个字段会让"关过渡"与"改位移"落在不同帧 —— 跟手第一段被曲线吃掉，看着慢半拍。
   // ⚠️ 必须 capture-bind：van-swipe-cell 拖动中会 catchtouchmove 阻断冒泡，
   // 换成 bind 则"手指落在卡片上"的 touchmove 收不到 —— 而贴顶下拉恰好全落在卡片上。
-  ['utils/search-reveal.ts', 'export function topPullIntent(', '贴顶下拉 → 露出（纯函数）'],
+  ['utils/search-reveal.ts', 'export function pullOffsetFromDrag(', '手指位移 → 内容下移量（纯函数）'],
+  ['utils/search-reveal.ts', 'export const PULL_ACTIVATE_PX = 6;', '跟手激活死区（横向滑删的纵向漂移不误抖）'],
+  ['utils/search-reveal.ts', 'export function pullSnapTarget(', '松手吸附目标（纯函数）'],
+  ['behaviors/search-reveal.ts', 'searchPullOffset: number;', '当前实际位移字段（跟手逐帧更新）'],
   ['behaviors/search-reveal.ts', 'searchTouchY: number | null;', '贴顶下拉手势起点字段'],
-  ['behaviors/search-reveal.ts', 'onSearchTouchStart(e: SearchTouchEvent) {', '触摸开始记起点（方法）'],
-  ['behaviors/search-reveal.ts', 'onSearchTouchMove(e: SearchTouchEvent) {', '贴顶下拉露出（方法）'],
-  ['behaviors/search-reveal.ts', 'onSearchTouchEnd() {', '手指离开清起点（方法）'],
+  ['behaviors/search-reveal.ts', 'function pullStyleOf(offset: number, dragging: boolean): string', '位移 + 过渡拼进同一次 setData'],
+  ['behaviors/search-reveal.ts', 'onSearchTouchStart() {', '触摸开始清采样（方法）'],
+  ['behaviors/search-reveal.ts', 'onSearchTouchMove(e: SearchTouchEvent) {', '贴顶后接管、位移跟手（方法）'],
+  ['behaviors/search-reveal.ts', 'onSearchTouchEnd() {', '松手按速度/距离吸附（方法）'],
+  ['behaviors/search-reveal.ts', 'applyPullOffset(offset: number, shown: boolean) {', '位移与展开态的唯一出口（方法）'],
+  ['app.wxss', '.pull {\n  position: relative;', '跟手位移容器样式'],
   ['pages/ledger/list/index.wxml', 'capture-bind:touchmove="onSearchTouchMove"', '记账列表贴顶下拉（捕获阶段，调用点）'],
   ['pages/notes/list/index.wxml', 'capture-bind:touchmove="onSearchTouchMove"', '记事列表贴顶下拉（捕获阶段，调用点）'],
   // 挂载点（调用点）单独钉住：编排抽走后，页面必须还挂着 mixin 与可见 id 钩子
@@ -393,9 +402,15 @@ const FORBIDDEN = [
   // .row-collapse 平时不能 overflow: hidden：会裁掉卡片 box-shadow，
   // 浅色主题下记录卡失去立体感（2026-09-21 用户反馈）；裁剪只在 --out 收起动画时需要
   ['app.wxss', '.row-collapse {\n  overflow: hidden;', '行收起容器平时不裁剪阴影'],
-  // 搜索栏收起必须是"高度归零"（.search-slot）：wx:if 会让它没有过渡、且撑开瞬间内容跳位
-  ['pages/ledger/list/index.wxml', 'wx:if="{{ searchShown }}"', '搜索栏靠高度收起，不用 wx:if'],
-  ['pages/notes/list/index.wxml', 'wx:if="{{ searchShown }}"', '搜索栏靠高度收起，不用 wx:if'],
+  // 搜索栏不许退回"高度撑开"（.search-slot--on / height 过渡）：那条路把搜索框压扁着展开，
+  // 也给不出跟手感。现在收起态是位移 0（栏子停在 .pull 上方一个槽位高处，完全在视口外），
+  // 露出靠 .pull 的 translate3d 跟随手指 —— 谁把高度过渡加回来就会复现"拉到阈值才整体弹出"。
+  ['pages/ledger/list/index.wxml', 'search-slot--on', '搜索栏不再用高度撑开，改跟手位移'],
+  ['pages/notes/list/index.wxml', 'search-slot--on', '搜索栏不再用高度撑开，改跟手位移'],
+  ['app.wxss', '.search-slot {\n  height: 0;', '搜索栏容器不再走高度收起'],
+  // wx:if 会让搜索栏没有过渡、且改变节点数（出场瞬间内容跳位）
+  ['pages/ledger/list/index.wxml', 'wx:if="{{ searchShown }}"', '搜索栏不用 wx:if 控制显隐'],
+  ['pages/notes/list/index.wxml', 'wx:if="{{ searchShown }}"', '搜索栏不用 wx:if 控制显隐'],
 ];
 
 /** 排除目录（与 project.config.json 的 packOptions.ignore 思路一致） */

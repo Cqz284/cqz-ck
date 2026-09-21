@@ -1,28 +1,39 @@
 /**
- * 顶部搜索栏「下拉露出 / 自动收起」的测试
+ * 顶部搜索栏「跟手下拉 · 松手吸附 · 自动收起」的测试
  *
  * 两层：
- * 1) utils/search-reveal.ts —— 纯判定（方向、靠近顶部、能否滚动），无副作用
- * 2) behaviors/search-reveal.ts —— 编排（setData、空闲定时器、强制收回）
+ * 1) utils/search-reveal.ts —— 纯判定（跟手位移映射、吸附目标、方向、能否滚动），无副作用
+ * 2) behaviors/search-reveal.ts —— 编排（setData、空闲定时器、手势采样）
  *
- * 钉住的口径（2026-09-21 用户定稿）：
- * - 下拉露出只在贴近顶部时生效（列表中部上滑时撑开会把内容整体下移，看着像"自己跳"）
+ * 钉住的口径（2026-09-21 第二轮定稿，对齐微信聊天列表顶部搜索框）：
+ * - 手指下拉多少、内容就下移多少（1:1，只差一个固定的激活死区）
+ * - 拉过槽位高度后进入阻尼段；松手按「甩动速度优先，其次拉出量」吸附到全开或回弹
  * - 往下翻立即收起；露出后无操作 5s 也收起
  * - 有输入 / 聚焦中不收（别把生效中的筛选藏起来）
  * - 多选态一律收起（搜索与多选是两套操作）
  * - 内容短到不能滚动时搜索栏常驻（否则用户永远做不出"下拉"这个动作）
  */
 import {
+  PULL_ACTIVATE_PX,
+  PULL_MAX_RATIO,
+  PULL_OVERSHOOT_DAMPING,
+  PULL_SNAP_RATIO,
+  PULL_SNAP_VELOCITY,
   SEARCH_DIRECTION_EPS,
   SEARCH_IDLE_HIDE_MS,
   SEARCH_PULL_TOP_TOLERANCE_PX,
-  SEARCH_PULL_TRIGGER_PX,
   SEARCH_REVEAL_TOP_PX,
+  pullOffsetFromDrag,
+  pullSnapTarget,
   searchFitsViewport,
   searchScrollIntent,
-  topPullIntent,
 } from '../../utils/search-reveal';
 import { searchRevealData, searchRevealMixin } from '../../behaviors/search-reveal';
+
+/** 槽位高度的 px 值：96rpx × 375/750 = 48px（jest.setup.js 的窗口宽固定 375） */
+const SLOT = 48;
+/** 手指走多少才会让内容完整下移一个槽位高（含激活死区） */
+const FULL_PULL = SLOT + PULL_ACTIVATE_PX;
 
 describe('search-reveal · searchScrollIntent', () => {
   const base = { prevTop: 0, top: 0, shown: false, blocked: false };
@@ -64,9 +75,63 @@ describe('search-reveal · searchScrollIntent', () => {
   });
 });
 
+describe('search-reveal · pullOffsetFromDrag（跟手位移映射）', () => {
+  test('激活死区内 / 往回退 → 位移恒为 0（横向滑动的纵向漂移不该让整页抖）', () => {
+    expect(pullOffsetFromDrag({ dy: 0, slotHeight: SLOT })).toBe(0);
+    expect(pullOffsetFromDrag({ dy: PULL_ACTIVATE_PX, slotHeight: SLOT })).toBe(0);
+    expect(pullOffsetFromDrag({ dy: 3, slotHeight: SLOT })).toBe(0);
+    expect(pullOffsetFromDrag({ dy: -80, slotHeight: SLOT })).toBe(0);
+  });
+
+  test('越过死区后 1:1 跟手：手指走多少内容就下移多少（只差那个固定偏移）', () => {
+    expect(pullOffsetFromDrag({ dy: PULL_ACTIVATE_PX + 10, slotHeight: SLOT })).toBe(10);
+    expect(pullOffsetFromDrag({ dy: FULL_PULL, slotHeight: SLOT })).toBe(SLOT);
+  });
+
+  test('拉过槽位高度进入阻尼段：超出部分只按 35% 计入', () => {
+    expect(pullOffsetFromDrag({ dy: FULL_PULL + 40, slotHeight: SLOT })).toBeCloseTo(
+      SLOT + 40 * PULL_OVERSHOOT_DAMPING,
+      6
+    );
+  });
+
+  test('阻尼段封顶：拉得再远也不超过槽高的 PULL_MAX_RATIO 倍', () => {
+    expect(pullOffsetFromDrag({ dy: 10000, slotHeight: SLOT })).toBeCloseTo(SLOT * PULL_MAX_RATIO, 6);
+  });
+
+  test('槽位高度拿不到（0）时不做位移，也不抛错', () => {
+    expect(pullOffsetFromDrag({ dy: 100, slotHeight: 0 })).toBe(0);
+    expect(pullOffsetFromDrag({ dy: NaN, slotHeight: NaN })).toBe(0);
+  });
+});
+
+describe('search-reveal · pullSnapTarget（松手吸附）', () => {
+  test('位移过门槛 → 全开；没过 → 回弹', () => {
+    expect(pullSnapTarget({ offset: SLOT * PULL_SNAP_RATIO, velocity: 0, slotHeight: SLOT })).toBe('open');
+    expect(pullSnapTarget({ offset: SLOT * PULL_SNAP_RATIO - 1, velocity: 0, slotHeight: SLOT })).toBe('close');
+  });
+
+  test('速度优先：位移不够但向下甩得够快也算要开', () => {
+    expect(pullSnapTarget({ offset: 2, velocity: PULL_SNAP_VELOCITY, slotHeight: SLOT })).toBe('open');
+  });
+
+  test('速度优先：位移够但向上甩 → 回弹（甩动比"拉到哪"更能表达意图）', () => {
+    expect(pullSnapTarget({ offset: SLOT, velocity: -PULL_SNAP_VELOCITY, slotHeight: SLOT })).toBe('close');
+  });
+
+  test('没甩到位（速度在阈值内）时看位移，不看符号', () => {
+    expect(pullSnapTarget({ offset: SLOT, velocity: -PULL_SNAP_VELOCITY / 2, slotHeight: SLOT })).toBe('open');
+  });
+
+  test('槽位高度拿不到（0）/ 异常入参 → 回弹，不抛错', () => {
+    expect(pullSnapTarget({ offset: 100, velocity: 0, slotHeight: 0 })).toBe('close');
+    expect(() => pullSnapTarget({ offset: NaN, velocity: NaN, slotHeight: NaN })).not.toThrow();
+    expect(pullSnapTarget({ offset: NaN, velocity: NaN, slotHeight: SLOT })).toBe('close');
+  });
+});
+
 describe('search-reveal · searchFitsViewport', () => {
   const WINDOW_H = 667;
-  const SLOT = 48;
 
   test('减掉搜索栏自身占位再比较：撑开/收起不会来回翻', () => {
     // 内容 700px（含已撑开的 48）→ 基础内容 652 < 667 → 判定"不能滚动"
@@ -74,9 +139,9 @@ describe('search-reveal · searchFitsViewport', () => {
     // 去掉搜索栏后同样的 700（说明现在没撑开）→ 700 > 667 → 能滚动
     expect(searchFitsViewport(700, WINDOW_H, SLOT, false)).toBe(false);
     // 关键：不能出现"撑开 → 能滚动 → 收起 → 又不能滚动"的振荡
-    const shownFit = searchFitsViewport(700, WINDOW_H, SLOT, true);
-    const hiddenFit = searchFitsViewport(700 - SLOT, WINDOW_H, SLOT, false);
-    expect(shownFit).toBe(hiddenFit);
+    expect(searchFitsViewport(700, WINDOW_H, SLOT, true)).toBe(
+      searchFitsViewport(700 - SLOT, WINDOW_H, SLOT, false)
+    );
   });
 
   test('量不到高度（0）时不改判定', () => {
@@ -85,7 +150,7 @@ describe('search-reveal · searchFitsViewport', () => {
   });
 
   test('只比视口高一点点也算"不能滚动"：那点滚动范围做不出一次下拉', () => {
-    // 680 > 667，但只高 13px（< 方向阈值 8 + 余量），用户滚一下就到头、根本触发不了露出
+    // 680 > 667，但只高 13px，用户滚一下就到头、根本触发不了露出
     expect(searchFitsViewport(680, WINDOW_H, SLOT, false)).toBe(true);
     // 高出余量之外才算能滚动
     expect(searchFitsViewport(WINDOW_H + 25, WINDOW_H, SLOT, false)).toBe(false);
@@ -109,6 +174,13 @@ function makeHost(init: { keyword?: string; selecting?: boolean } = {}) {
   return { host, data, setDataLog };
 }
 
+/** 把一段手势走到"已接管且手指走了 dy"的下一步状态；返回 host */
+function dragTo(host: ReturnType<typeof makeHost>['host'], dy: number, dt = 400) {
+  host.onSearchTouchStart();
+  host.onSearchTouchMove({ touches: [{ clientY: 300 }], timeStamp: 1000 });
+  host.onSearchTouchMove({ touches: [{ clientY: 300 + dy }], timeStamp: 1000 + dt });
+}
+
 describe('search-reveal · 编排', () => {
   beforeEach(() => {
     jest.useFakeTimers();
@@ -117,35 +189,201 @@ describe('search-reveal · 编排', () => {
     jest.useRealTimers();
   });
 
-  test('下拉到顶露出；露出后无操作 5s 自动收回', () => {
-    const { host } = makeHost();
-    expect(host.data.searchShown).toBe(false);
+  test('初始态是"收起"：位移 0、目标态 false', () => {
+    const { host, data } = makeHost();
+    expect(data.searchShown).toBe(false);
+    expect(host.searchPullOffset).toBe(0);
+    expect(data.searchPullStyle).toContain('translate3d(0, 0px, 0)');
+  });
+
+  test('贴顶下拉拉到顶露出；露出后无操作 5s 自动收回', () => {
+    const { host, data } = makeHost();
     host.onPageScrollSearch(0); // 首帧：lastTop 从 0 开始，无位移
-    host.onPageScrollSearch(200);
-    host.data.searchShown = false; // 往下翻过，回到"收起"
-    host.searchLastTop = 200;
+    host.onPageScrollSearch(400); // 往下翻
+    host.searchLastTop = 400;
     host.onPageScrollSearch(0); // 拉回顶部
-    expect(host.data.searchShown).toBe(true);
+    expect(data.searchShown).toBe(true);
+    expect(host.searchPullOffset).toBe(SLOT);
 
     jest.advanceTimersByTime(SEARCH_IDLE_HIDE_MS - 1);
-    expect(host.data.searchShown).toBe(true);
+    expect(data.searchShown).toBe(true);
     jest.advanceTimersByTime(1);
-    expect(host.data.searchShown).toBe(false);
+    expect(data.searchShown).toBe(false);
+    expect(host.searchPullOffset).toBe(0);
   });
 
   test('往下翻立即收起', () => {
-    const { host } = makeHost();
+    const { host, data } = makeHost();
     host.showSearch();
-    expect(host.data.searchShown).toBe(true);
-    host.onPageScrollSearch(0);
+    expect(data.searchShown).toBe(true);
     host.onPageScrollSearch(300);
-    expect(host.data.searchShown).toBe(false);
+    expect(data.searchShown).toBe(false);
+  });
+
+  test('跟手：手指拉多少位移就多少（只差激活死区），且过渡关闭（否则看着慢半拍）', () => {
+    const { host, data } = makeHost();
+    dragTo(host, 0, 16); // 第一帧只接管，不产生位移
+    expect(host.searchTouchY).toBe(300);
+    expect(host.searchPullOffset).toBe(0);
+
+    host.onSearchTouchMove({ touches: [{ clientY: 320 }], timeStamp: 1032 }); // 手指走 20
+    expect(host.searchPullOffset).toBe(20 - PULL_ACTIVATE_PX);
+    expect(data.searchPullStyle).toContain(`translate3d(0, ${20 - PULL_ACTIVATE_PX}px, 0)`);
+    expect(data.searchPullStyle).toContain('transition: none');
+    // 跟手中「露出的目标态」还没定：定型的是松手吸附那一下
+    expect(data.searchShown).toBe(false);
+  });
+
+  test('死区内的漂移：跟手已接管但不产生位移（横向滑删不误抖）', () => {
+    const { host, data } = makeHost();
+    dragTo(host, 0, 16);
+    host.onSearchTouchMove({ touches: [{ clientY: 304 }], timeStamp: 1032 }); // 只漂了 4px
+    expect(host.searchPullOffset).toBe(0);
+    host.onSearchTouchEnd();
+    expect(data.searchShown).toBe(false);
+    expect(host.searchPullOffset).toBe(0);
+  });
+
+  test('手指停住时不空转 setData（每帧都会进来）', () => {
+    const { host, setDataLog } = makeHost();
+    dragTo(host, 0, 16);
+    host.onSearchTouchMove({ touches: [{ clientY: 330 }], timeStamp: 1032 });
+    const n = setDataLog.length;
+    host.onSearchTouchMove({ touches: [{ clientY: 330 }], timeStamp: 1048 });
+    expect(setDataLog.length).toBe(n);
+  });
+
+  test('松手：拉出量过门槛 → 吸附到全开（并恢复过渡曲线）', () => {
+    const { host, data } = makeHost();
+    dragTo(host, 60, 16); // 位移 54 > 48×0.4
+    host.onSearchTouchEnd();
+    expect(data.searchShown).toBe(true);
+    expect(host.searchPullOffset).toBe(SLOT);
+    expect(data.searchPullStyle).toContain('translate3d(0, 48px, 0)');
+    expect(data.searchPullStyle).not.toContain('transition: none');
+  });
+
+  test('松手：拉得不够就回弹到 0', () => {
+    const { host, data } = makeHost();
+    dragTo(host, 10); // 慢速（400ms 挪 10px）→ 速度不足以触发吸附，位移也只 4px
+    host.onSearchTouchEnd();
+    expect(data.searchShown).toBe(false);
+    expect(host.searchPullOffset).toBe(0);
+    expect(data.searchPullStyle).toContain('translate3d(0, 0px, 0)');
+  });
+
+  test('松手：位移很小但向下甩得够快 → 也算要开', () => {
+    const { host, data } = makeHost();
+    host.onSearchTouchStart();
+    host.onSearchTouchMove({ touches: [{ clientY: 300 }], timeStamp: 1000 });
+    host.onSearchTouchMove({ touches: [{ clientY: 308 }], timeStamp: 1010 }); // 0.8 px/ms
+    host.onSearchTouchEnd();
+    expect(data.searchShown).toBe(true);
+  });
+
+  test('松手：拉到位但向上甩 → 回弹', () => {
+    const { host, data } = makeHost();
+    host.onSearchTouchStart();
+    host.onSearchTouchMove({ touches: [{ clientY: 300 }], timeStamp: 1000 });
+    host.onSearchTouchMove({ touches: [{ clientY: 360 }], timeStamp: 1100 });
+    host.onSearchTouchMove({ touches: [{ clientY: 340 }], timeStamp: 1120 }); // 上甩 -1 px/ms
+    host.onSearchTouchEnd();
+    expect(data.searchShown).toBe(false);
+    expect(host.searchPullOffset).toBe(0);
+  });
+
+  test('松手不足量 → 回弹：不因"正在使用"把位移卡在半路', () => {
+    const { host, data } = makeHost({ keyword: '餐饮' });
+    dragTo(host, 10);
+    expect(host.searchPullOffset).toBe(10 - PULL_ACTIVATE_PX);
+    host.onSearchTouchEnd();
+    // 回弹是"这段手势没拉够"，与"有关键词"无关：位移归零、过渡恢复
+    expect(host.searchPullOffset).toBe(0);
+    expect(data.searchShown).toBe(false);
+    expect(data.searchPullStyle).not.toContain('transition: none');
+  });
+
+  test('列表不能滚动时：手势结束保持常驻（那里没有"收起"这个状态）', () => {
+    const { host, data } = makeHost();
+    host.searchUnscrollable = true; // 常驻栏被多选态藏起来后的状态
+    dragTo(host, 10);
+    host.onSearchTouchEnd();
+    expect(data.searchShown).toBe(true);
+    expect(host.searchPullOffset).toBe(SLOT);
+  });
+
+  test('跟手到一半被外部接管：位移归位、残留手势被丢弃', () => {
+    const { host } = makeHost();
+    dragTo(host, 30, 16);
+    expect(host.searchPullOffset).toBe(30 - PULL_ACTIVATE_PX);
+    host.showSearch(); // 外部（滚动 / 吸附）接管
+    expect(host.searchTouchY).toBeNull();
+    expect(host.searchPullOffset).toBe(SLOT);
+    // 残留的 move 不该再写值
+    host.onSearchTouchMove({ touches: [{ clientY: 500 }], timeStamp: 1100 });
+    expect(host.searchPullOffset).toBe(SLOT);
+  });
+
+  test('已露出 → 不再进入跟手（没有"再拉出来"这回事）', () => {
+    const { host, data, setDataLog } = makeHost();
+    host.showSearch();
+    const n = setDataLog.length;
+    host.onSearchTouchStart();
+    host.onSearchTouchMove({ touches: [{ clientY: 600 }], timeStamp: 1000 });
+    expect(host.searchTouchY).toBeNull();
+    expect(setDataLog.length).toBe(n);
+    expect(data.searchShown).toBe(true);
+  });
+
+  test('多选态 → 不接管手势，也不露出', () => {
+    const { host, data } = makeHost({ selecting: true });
+    dragTo(host, 200, 16);
+    expect(host.searchTouchY).toBeNull();
+    expect(host.searchPullOffset).toBe(0);
+    expect(data.searchShown).toBe(false);
+  });
+
+  test('中部下拉不接管；手指没松开就滚回顶部，同一段手势仍能接住（top 现读）', () => {
+    const { host } = makeHost();
+    host.searchLastTop = 500;
+    host.onSearchTouchStart();
+    host.onSearchTouchMove({ touches: [{ clientY: 300 }], timeStamp: 1000 });
+    expect(host.searchTouchY).toBeNull(); // 中部：不接管
+
+    host.searchLastTop = 0; // 同一段手势里页面回到顶部
+    host.onSearchTouchMove({ touches: [{ clientY: 300 }], timeStamp: 1016 });
+    expect(host.searchTouchY).toBe(300); // 从这一帧起算
+    host.onSearchTouchMove({ touches: [{ clientY: 348 }], timeStamp: 1032 });
+    expect(host.searchPullOffset).toBe(SLOT - PULL_ACTIVATE_PX);
+  });
+
+  test('贴顶容差：滚动刚归零时还差一两像素也算贴顶', () => {
+    const { host } = makeHost();
+    host.searchLastTop = SEARCH_PULL_TOP_TOLERANCE_PX;
+    host.onSearchTouchStart();
+    host.onSearchTouchMove({ touches: [{ clientY: 300 }], timeStamp: 1000 });
+    expect(host.searchTouchY).toBe(300);
+
+    const b = makeHost();
+    b.host.searchLastTop = SEARCH_PULL_TOP_TOLERANCE_PX + 1;
+    b.host.onSearchTouchStart();
+    b.host.onSearchTouchMove({ touches: [{ clientY: 300 }], timeStamp: 1000 });
+    expect(b.host.searchTouchY).toBeNull();
+  });
+
+  test('异常事件（缺 touches / 坐标非数字）不抛错，也不激活手势', () => {
+    const { host } = makeHost();
+    expect(() => host.onSearchTouchStart()).not.toThrow();
+    expect(() => host.onSearchTouchMove({})).not.toThrow();
+    expect(() => host.onSearchTouchMove({ touches: [] })).not.toThrow();
+    expect(() => host.onSearchTouchMove({ touches: [{ clientY: NaN }] })).not.toThrow();
+    expect(() => host.onSearchTouchEnd()).not.toThrow();
+    expect(host.searchTouchY).toBeNull();
   });
 
   test('有输入 / 聚焦中都不自动收起（别把生效中的筛选藏起来）', () => {
     const { host, data } = makeHost({ keyword: '早餐' });
     host.showSearch();
-    host.onPageScrollSearch(0);
     host.onPageScrollSearch(400); // 往下翻
     expect(data.searchShown).toBe(true);
 
@@ -181,9 +419,10 @@ describe('search-reveal · 编排', () => {
     data.selecting = true;
     host.hideSearchIfShown(); // swipe-select 的 enterSelect 走这里
     expect(data.searchShown).toBe(false);
+    expect(host.searchPullOffset).toBe(0);
 
     // 多选态下再下拉也不露出
-    host.searchLastTop = 200;
+    host.searchLastTop = 400;
     host.onPageScrollSearch(0);
     expect(data.searchShown).toBe(false);
   });
@@ -193,6 +432,7 @@ describe('search-reveal · 编排', () => {
     a.host.showSearch();
     a.host.resetSearchReveal();
     expect(a.data.searchShown).toBe(false);
+    expect(a.host.searchPullOffset).toBe(0);
     expect(a.host.searchLastTop).toBe(0);
 
     const b = makeHost({ keyword: '餐饮' });
@@ -203,149 +443,37 @@ describe('search-reveal · 编排', () => {
 
   test('内容短到不能滚动 → 常驻露出；变长后退回"可收起"并计时', () => {
     const { host, data } = makeHost();
+    const mockQuery = (scrollHeight: number) => {
+      (globalThis as unknown as { wx: { createSelectorQuery: () => unknown } }).wx.createSelectorQuery = () => ({
+        selectViewport() {
+          return this;
+        },
+        scrollOffset(cb: (r: { scrollHeight: number }) => void) {
+          cb({ scrollHeight });
+          return this;
+        },
+        exec() {
+          return this;
+        },
+      });
+    };
+
     // 内容 600 < 可视 667（无搜索栏占位）→ 不能滚动
-    (globalThis as unknown as { wx: { createSelectorQuery: () => unknown } }).wx.createSelectorQuery = () => ({
-      selectViewport() {
-        return this;
-      },
-      scrollOffset(cb: (r: { scrollHeight: number }) => void) {
-        cb({ scrollHeight: 600 });
-        return this;
-      },
-      exec() {
-        return this;
-      },
-    });
+    mockQuery(600);
     host.checkSearchRevealFit();
     expect(host.searchUnscrollable).toBe(true);
     expect(data.searchShown).toBe(true);
 
-    // 常驻期间：空闲超时 / 往下翻都不该把它收掉（收掉就再也拉不出来）
-    host.onPageScrollSearch(0);
+    // 常驻期间：空闲超时 / 往下翻 / 抬手都不该把它收掉（收掉就再也拉不出来）
     host.onPageScrollSearch(400);
+    host.onSearchTouchEnd();
     jest.advanceTimersByTime(SEARCH_IDLE_HIDE_MS * 2);
     expect(data.searchShown).toBe(true);
 
-    // 内容变长（能滚动）→ 交回给"下拉露出"的规则，并立刻收起 + 计时
-    (globalThis as unknown as { wx: { createSelectorQuery: () => unknown } }).wx.createSelectorQuery = () => ({
-      selectViewport() {
-        return this;
-      },
-      scrollOffset(cb: (r: { scrollHeight: number }) => void) {
-        cb({ scrollHeight: 3000 });
-        return this;
-      },
-      exec() {
-        return this;
-      },
-    });
+    // 内容变长（能滚动）→ 交回给"下拉露出"的规则，并立刻收起
+    mockQuery(3000);
     host.checkSearchRevealFit();
     expect(host.searchUnscrollable).toBe(false);
     expect(data.searchShown).toBe(false);
-  });
-});
-
-describe('search-reveal · topPullIntent（贴顶下拉补位）', () => {
-  const base = { dy: 0, top: 0, shown: false, blocked: false };
-
-  test('贴顶且下移达到阈值 → 露出', () => {
-    expect(topPullIntent({ ...base, dy: SEARCH_PULL_TRIGGER_PX })).toBe('show');
-    expect(topPullIntent({ ...base, dy: 120 })).toBe('show');
-  });
-
-  test('下移不够阈值 → 不动（横向滑动的纵向分量不该误开搜索栏）', () => {
-    expect(topPullIntent({ ...base, dy: SEARCH_PULL_TRIGGER_PX - 1 })).toBe('none');
-    expect(topPullIntent({ ...base, dy: 10 })).toBe('none');
-  });
-
-  test('不在顶部 → 不动（中部下拉归 searchScrollIntent 管，两路不抢同一段手势）', () => {
-    expect(topPullIntent({ ...base, dy: 120, top: 400 })).toBe('none');
-    // 容差内仍算贴顶：onPageScroll 的回报有延迟，刚归零时可能还差一两像素
-    expect(topPullIntent({ ...base, dy: 120, top: SEARCH_PULL_TOP_TOLERANCE_PX })).toBe('show');
-    expect(topPullIntent({ ...base, dy: 120, top: SEARCH_PULL_TOP_TOLERANCE_PX + 1 })).toBe('none');
-  });
-
-  test('已露出 / 多选态 → 不动', () => {
-    expect(topPullIntent({ ...base, dy: 120, shown: true })).toBe('none');
-    expect(topPullIntent({ ...base, dy: 120, blocked: true })).toBe('none');
-  });
-
-  test('异常入参（NaN / 负数）按 0 处理，不抛错', () => {
-    expect(() => topPullIntent({ ...base, dy: NaN, top: NaN })).not.toThrow();
-    expect(topPullIntent({ ...base, dy: -60 })).toBe('none');
-  });
-});
-
-describe('search-reveal · 贴顶下拉编排', () => {
-  test('进页就停在顶部：手指下拉（scrollTop 恒为 0）也能把搜索栏拉出来', () => {
-    const { host, data } = makeHost();
-    // 页面本来就在顶部：scrollTop 0 → 0，从方向上什么也看不出来（这就是修复前的症状）
-    host.onPageScrollSearch(0);
-    expect(data.searchShown).toBe(false);
-
-    host.onSearchTouchStart({ touches: [{ clientY: 300 }] });
-    host.onSearchTouchMove({ touches: [{ clientY: 300 + SEARCH_PULL_TRIGGER_PX }] });
-    expect(data.searchShown).toBe(true);
-  });
-
-  test('一次手势只露一次：露出后继续拖不再产生 setData', () => {
-    const { host, data, setDataLog } = makeHost();
-    host.onSearchTouchStart({ touches: [{ clientY: 300 }] });
-    host.onSearchTouchMove({ touches: [{ clientY: 400 }] });
-    expect(data.searchShown).toBe(true);
-    const calls = setDataLog.length;
-
-    // 起点已被清掉，后续 move 全部空转
-    host.onSearchTouchMove({ touches: [{ clientY: 500 }] });
-    host.onSearchTouchMove({ touches: [{ clientY: 600 }] });
-    expect(setDataLog.length).toBe(calls);
-  });
-
-  test('横向滑动不误触；手指离开后起点清掉', () => {
-    const { host, data } = makeHost();
-    host.onSearchTouchStart({ touches: [{ clientY: 300 }] });
-    host.onSearchTouchMove({ touches: [{ clientY: 310 }] }); // 左滑删除：纵向只挪 10px
-    expect(data.searchShown).toBe(false);
-
-    host.onSearchTouchEnd();
-    expect(host.searchTouchY).toBeNull();
-    // 起点清了之后，残留的 move 不该再算进上一次手势
-    host.onSearchTouchMove({ touches: [{ clientY: 600 }] });
-    expect(data.searchShown).toBe(false);
-  });
-
-  test('中部下拉不开；手指没松开就滚回顶部，同一段手势仍能接住（top 现读）', () => {
-    const { host, data } = makeHost();
-    host.searchLastTop = 500;
-    host.onSearchTouchStart({ touches: [{ clientY: 300 }] });
-    host.onSearchTouchMove({ touches: [{ clientY: 400 }] });
-    expect(data.searchShown).toBe(false);
-
-    host.searchLastTop = 0;
-    host.onSearchTouchMove({ touches: [{ clientY: 400 }] });
-    expect(data.searchShown).toBe(true);
-  });
-
-  test('已露出 / 多选态：touchstart 不记起点，move 也不露出', () => {
-    const a = makeHost();
-    a.host.showSearch();
-    a.host.searchTouchY = 999; // 模拟上一段手势的残留
-    a.host.onSearchTouchStart({ touches: [{ clientY: 300 }] });
-    expect(a.host.searchTouchY).toBeNull();
-
-    const b = makeHost({ selecting: true });
-    b.host.searchTouchY = 999;
-    b.host.onSearchTouchStart({ touches: [{ clientY: 300 }] });
-    expect(b.host.searchTouchY).toBeNull();
-    b.host.onSearchTouchMove({ touches: [{ clientY: 999 }] });
-    expect(b.data.searchShown).toBe(false);
-  });
-
-  test('异常事件（缺 touches / 坐标非数字）不抛错，也不激活手势', () => {
-    const { host } = makeHost();
-    expect(() => host.onSearchTouchStart({})).not.toThrow();
-    expect(() => host.onSearchTouchStart({ touches: [] })).not.toThrow();
-    expect(() => host.onSearchTouchMove({ touches: [{ clientY: NaN }] })).not.toThrow();
-    expect(host.searchTouchY).toBeNull();
   });
 });

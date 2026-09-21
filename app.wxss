@@ -32,9 +32,9 @@ page {
   --accent: #ffb74d;
   --accent-soft: #fff4e3;
   --shadow-card: 0 4rpx 20rpx rgba(150, 125, 95, 0.08);
-  /* 顶部搜索栏收起容器的展开高度（.search-slot--on）。
+  /* 顶部搜索栏的槽位高度（.search-slot 的高度，也就是"完全露出所需的位移量"）。
      ⚠️ 必须与 utils/search-reveal.ts 的 SEARCH_SLOT_HEIGHT_RPX（rpx 数值）一致：
-     JS 侧要拿它换算 px 来判断"内容够不够滚动"，两边对不上会让常驻判定偏一点。 */
+     JS 侧要拿它换算 px 来判断"内容够不够滚动"与"拉出量过没过吸附门槛"，两边对不上会偏。 */
   --search-slot-h: 96rpx;
 
   /* ===== Vant 变量（浅色） ===== */
@@ -298,29 +298,34 @@ page {
   margin-top: 6rpx;
 }
 
-/* ===== 顶部搜索栏的显隐容器（记账 / 记事列表共用；下拉露出 · 自动收起） =====
-   高度用**确定值** --search-slot-h（van-search 的自然高度，见 utils/search-reveal.ts 的
-   SEARCH_SLOT_HEIGHT_RPX）：写成 max-height 猜一个大值的话，动画后半段会"空跑"，
-   观感是抽屉先冲开再停顿。
-   ⚠️ 这里的 overflow: hidden 是必要的（与 .row-collapse 平时放开的结论相反）：
-   收起态高度为 0，不裁切的话搜索框会直接盖在下面的内容上。 ===== */
+/* ===== 顶部搜索栏「跟手下拉」（记账 / 记事列表共用） =====
+   结构：`.pull` 包住搜索栏与全部内容，JS 把当前位移拼成内联 style 写在它上面 ——
+     transform: translate3d(0, <位移>px, 0); transition: <none | 吸附曲线>
+   搜索栏则绝对定位到 `.pull` **上方**一个槽位高度处：位移为 0 时它整体在视口上方之外，
+   位移到一个槽位高时正好落进视口顶。于是观感是"搜索框从上方滑入、内容整体下移"，
+   而不是"高度从 0 撑开"（后者会把搜索框压扁，height 过渡还要重排，成本更高）。
+
+   ⚠️ 这里的 transition 只是**首帧兜底**（JS 写内联 style 之前的那一下）：真实时长与曲线
+   由 utils/search-reveal.ts 的 PULL_SETTLE_MS / PULL_SETTLE_EASING 决定，两边保持一致。
+   ⚠️ `.pull` 上的 transform 会给后代创建新的包含块，所以 `.page` 里不能有依赖它定位的
+   position: fixed 元素（本项目的 fab / 多选操作条 / 撤销条都在 .page 之外，安全）。 */
+.pull {
+  position: relative;
+  transform: translate3d(0, 0, 0);
+  transition: transform 0.34s cubic-bezier(0.22, 1.18, 0.36, 1);
+}
+
 .search-slot {
-  height: 0;
-  overflow: hidden;
-  opacity: 0;
-  transform: translateY(-8rpx);
-  transition: height 0.24s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease,
-    transform 0.24s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.search-slot--on {
+  position: absolute;
+  left: 0;
+  right: 0;
+  /* 停在 .pull 上方一个槽位高：位移为 0 时完全落在视口之外（不占位、不可点） */
+  bottom: 100%;
   height: var(--search-slot-h, 96rpx);
-  opacity: 1;
-  transform: translateY(0);
 }
 
-/* van-search 撑到与容器等高（垂直居中），让"槽位高度"成为确定值；
-   拿不到这条规则也不影响功能：自然高度略小于它，只是多几 rpx 留白。 */
+/* van-search 撑到与槽位等高（垂直居中），让"位移多少算完全露出"有确定基准；
+   拿不到这条规则也不影响功能：自然高度略小，只是多几 rpx 留白。 */
 .search-slot .van-search {
   height: var(--search-slot-h, 96rpx);
   align-items: center;

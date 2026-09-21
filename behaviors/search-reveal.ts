@@ -1,16 +1,31 @@
 /**
- * 列表页共享编排：顶部搜索栏「下拉露出 / 自动收起」
+ * 列表页共享编排：顶部搜索栏「跟手下拉 · 松手吸附 · 自动收起」
  *
- * 与 behaviors/swipe-select.ts 同一套写法：纯 TS 工厂/对象字面量 + 页面选项里展开，
+ * 与 behaviors/swipe-select.ts 同一套写法：纯 TS 对象字面量 + 页面选项里展开，
  * 不用 Behavior()（页面统一用 Page<Data, Custom>() 泛型写法，Behavior 的合并运行时才发生，
  * 类型系统看不见）。这里用**对象字面量 + ThisType**：页面把它摊进自己的页面选项字面量即可，
  * 既保留 this 的完整类型，又不用改 defineSwipeSelectPage 的签名。
  *
+ * 位移模型（2026-09-21 第二轮定稿，对齐微信聊天列表顶部搜索框）：
+ * 搜索栏平时停在内容**上方一个槽位高度**处（绝对定位、脱离文档流），而**整个内容容器
+ * `.pull`** 用 transform 下移 `searchPullOffset` 把它带进视口 —— 所以观感是
+ * "搜索框从上方滑入、内容整体下移"，而不是"容器高度从 0 撑开"（后者会把搜索框压扁）。
+ * 手指贴顶下拉时位移逐帧跟手；松手按甩动速度 + 拉出量吸附到全开或回弹到 0。
+ *
+ * ⚠️ 跟手期间 transition 必须是 none（与位移一起拼在内联 style 里），否则位移被 0.34s
+ * 曲线拖住、看着"慢半拍才跟上"。松手时同一次 setData 里换成带过冲的曲线 → 落位带弹簧感。
+ * 这套"拖动中 none / 松手后过渡"的机制与 Vant swipe-cell 的跟手左滑完全一致
+ * （它也是把 transform 与 transition 拼进同一个 wrapperStyle）。
+ *
  * 宿主页面的约定（缺了不会报错，但行为会不对）：
  * - data 里有 `keyword`：非空视为"正在使用"，不自动收起
  * - data 里有 `selecting`（由 swipe-select 提供）：多选态强制收起
- * - 模板用 `<view class="search-slot {{ searchShown ? 'search-slot--on' : '' }}">` 包住 van-search
- *   （样式在 app.wxss，高度由 --search-slot-h 决定）
+ * - 模板结构（`.pull` 必须包住搜索栏与全部内容）：
+ *     <view class="pull" style="{{ searchPullStyle }}">
+ *       <view class="search-slot">…van-search…</view>
+ *       …其它内容…
+ *     </view>
+ *   （.pull 是 relative 容器，.search-slot 绝对定位到它上方，样式都在 app.wxss）
  * - onPageScroll 调 `onPageScrollSearch(e.scrollTop)`；onShow 调 `resetSearchReveal()`
  * - 页面根节点挂 `capture-bind:touchstart/touchmove/touchend/touchcancel="onSearchTouch*"`
  *   ⚠️ 必须是 **capture-bind**：van-swipe-cell 拖动中会在自己节点上 catchtouchmove
@@ -18,24 +33,35 @@
  * - refresh 之后调 `checkSearchRevealFit()`（内容短到不能滚动时要让搜索栏常驻）
  * - onUnload 调 `clearSearchTimer()`
  *
- * 显隐的判定全在 utils/search-reveal.ts（纯函数、有单测），这里只管编排与副作用。
+ * 判定全在 utils/search-reveal.ts（纯函数、有单测），这里只管编排与副作用。
  */
 import { rpxToPx } from '../utils/rpx';
 import {
+  PULL_SETTLE_EASING,
+  PULL_SETTLE_MS,
   SEARCH_IDLE_HIDE_MS,
+  SEARCH_PULL_TOP_TOLERANCE_PX,
   SEARCH_SLOT_HEIGHT_RPX,
+  pullOffsetFromDrag,
+  pullSnapTarget,
   searchFitsViewport,
   searchScrollIntent,
-  topPullIntent,
 } from '../utils/search-reveal';
 
 /** 共享 data 字段（页面 data 接口 extends 它，并在 data 字面量里展开 searchRevealData()） */
 export interface SearchRevealData {
-  /** 搜索栏是否露出；false 时容器高度为 0（不占位、不可点） */
+  /**
+   * 搜索栏是否露出（**目标态**）
+   *
+   * 跟手期间它与真实位移会短暂不一致（手指刚拉出一点、还没吸附），所以跟手中的判定
+   * 一律看 `searchPullOffset`，它只表达"露出的意图"，供模板条件与既有逻辑使用。
+   */
   searchShown: boolean;
+  /** `.pull` 的内联样式：transform（当前位移）+ transition（跟手时为 none） */
+  searchPullStyle: string;
 }
 
-/** 共享实例字段（滚动位置、定时器、聚焦态），由 mixin 在页面选项里声明 */
+/** 共享实例字段（滚动位置、手势采样、定时器、聚焦态），由 mixin 在页面选项里声明 */
 export interface SearchRevealFields {
   /** 上一次的 scrollTop（px），方向判定用 */
   searchLastTop: number;
@@ -45,23 +71,32 @@ export interface SearchRevealFields {
   searchFocused: boolean;
   /** 内容短到不能滚动（此时搜索栏常驻：不能滚动就永远做不出"下拉"这个动作） */
   searchUnscrollable: boolean;
-  /** 贴顶下拉手势的起点 clientY（px）；null = 这一路输入未激活 */
+  /** 当前实际位移（px）：data.searchPullStyle 的真值来源，跟手期间逐帧更新 */
+  searchPullOffset: number;
+  /** 跟手手势的起点 clientY（px）；null = 这一路输入未接管 */
   searchTouchY: number | null;
+  /** 最近一次 touchmove 的 clientY（px），算甩动速度用 */
+  searchPullLastY: number;
+  /** 最近一次 touchmove 的时间戳（ms），算甩动速度用 */
+  searchPullLastT: number;
+  /** 最近一次算出的纵向速度（px/ms，向下为正） */
+  searchPullVelocity: number;
 }
 
-/** 触摸事件的最小形状（只用到第一根手指的 clientY） */
+/** 触摸事件的最小形状（只用到第一根手指的 clientY 与事件时间戳） */
 export interface SearchTouchEvent {
   touches?: Array<{ clientY?: number }> | null;
+  timeStamp?: number;
 }
 
 export interface SearchRevealMethods {
   /** 页面滚动时调用（onPageScroll）：按方向露出 / 收起 */
   onPageScrollSearch(scrollTop: number): void;
-  /** 触摸开始（capture-bind:touchstart）：贴顶下拉那一路记起点 */
-  onSearchTouchStart(e: SearchTouchEvent): void;
-  /** 触摸移动（capture-bind:touchmove）：贴顶且下移够远就露出 */
+  /** 触摸开始（capture-bind:touchstart）：清掉上一段手势的残留采样 */
+  onSearchTouchStart(): void;
+  /** 触摸移动（capture-bind:touchmove）：贴顶后接管，位移 1:1 跟手 */
   onSearchTouchMove(e: SearchTouchEvent): void;
-  /** 触摸结束 / 取消：清掉手势起点 */
+  /** 触摸结束 / 取消：按甩动速度与拉出量吸附到全开或回弹 */
   onSearchTouchEnd(): void;
   /** 露出搜索栏（幂等；顺带起"无操作自动收起"的计时） */
   showSearch(): void;
@@ -93,6 +128,8 @@ interface SearchRevealSelf extends SearchRevealFields, SearchRevealMethods, Sear
 interface SearchRevealInternal {
   /** 起"无操作自动收起"的计时 */
   armSearchTimer(): void;
+  /** 把位移与展开态一次性应用到位（露出的唯一出口） */
+  applyPullOffset(offset: number, shown: boolean): void;
 }
 
 /** 摊进页面选项的完整 mixin 形状 */
@@ -100,12 +137,39 @@ export interface SearchRevealMixin extends SearchRevealFields, SearchRevealMetho
 
 /** 共享 data 的初始值 */
 export function searchRevealData(): SearchRevealData {
-  return { searchShown: false };
+  return { searchShown: false, searchPullStyle: pullStyleOf(0, false) };
 }
 
-/** 搜索栏占位高度的 px 值（与 .search-slot 的 --search-slot-h 同源） */
+/** 搜索栏槽位高度的 px 值（与 app.wxss 的 --search-slot-h 同源） */
 function slotHeightPx(): number {
   return rpxToPx(SEARCH_SLOT_HEIGHT_RPX);
+}
+
+/**
+ * 拼 `.pull` 的内联样式
+ *
+ * 位移与过渡必须**同一次**写进去。拆成两个 data 字段（或两次 setData）时，"关掉过渡"与
+ * "改位移"可能落在不同帧 —— 结果是跟手的第一段被过渡吃掉，看着慢半拍才跟上。
+ * 这跟 Vant swipe-cell 把 transform 与 transition 拼进同一个 wrapperStyle 是同一个道理。
+ *
+ * @param offset 内容下移距离（px）
+ * @param dragging 是否正在跟手（true = 不加过渡，位移即时生效）
+ */
+function pullStyleOf(offset: number, dragging: boolean): string {
+  const transition = dragging ? 'none' : `transform ${PULL_SETTLE_MS}ms ${PULL_SETTLE_EASING}`;
+  return `transform: translate3d(0, ${offset}px, 0); transition: ${transition};`;
+}
+
+/** 取第一根手指的 clientY；拿不到返回 null */
+function touchClientY(e: SearchTouchEvent): number | null {
+  const y = e && e.touches && e.touches[0] ? e.touches[0].clientY : undefined;
+  return typeof y === 'number' && Number.isFinite(y) ? y : null;
+}
+
+/** 取事件时间戳（ms）；小程序一定带 timeStamp，兜底用 Date.now() */
+function touchTime(e: SearchTouchEvent): number {
+  const t = e && typeof e.timeStamp === 'number' ? e.timeStamp : 0;
+  return t > 0 ? t : Date.now();
 }
 
 /**
@@ -122,7 +186,11 @@ export const searchRevealMixin: SearchRevealMixin & ThisType<SearchRevealSelf> =
   searchIdleTimer: null,
   searchFocused: false,
   searchUnscrollable: false,
+  searchPullOffset: 0,
   searchTouchY: null,
+  searchPullLastY: 0,
+  searchPullLastT: 0,
+  searchPullVelocity: 0,
 
   onPageScrollSearch(scrollTop: number) {
     const self = this;
@@ -139,54 +207,101 @@ export const searchRevealMixin: SearchRevealMixin & ThisType<SearchRevealSelf> =
   },
 
   /**
-   * 贴顶下拉：记手势起点
+   * 触摸开始：只清残留，不决定是否接管
    *
-   * 已经露出（或处于多选态）时这一路输入没有意义，直接不记起点 —— 之后每次 touchmove
-   * 都会在第一行空转返回，省掉无谓的位移计算。
+   * 接管判定故意放在 touchmove 里惰性做 —— 要接的不只是"起手就贴顶"的手势，还有
+   * "从列表中部一路拉回顶部"的手势。后者的起点在页面中部，dy 里混着一大段页面滚动，
+   * 只有等页面真的贴顶了才把它当跟手位移起算，位移才不会突变。
    */
-  onSearchTouchStart(e: SearchTouchEvent) {
+  onSearchTouchStart() {
     const self = this;
+    self.searchTouchY = null;
+    self.searchPullLastY = 0;
+    self.searchPullLastT = 0;
+    self.searchPullVelocity = 0;
+  },
+
+  /**
+   * 触摸移动：贴顶后接管，位移 1:1 跟手
+   *
+   * 进入接管只有一个判据 —— **此刻贴顶且手指在往下走**，两种时机共用它：
+   * - 起手就在顶部：第一次有效的 move 即接管
+   * - 从列表中部的下拉：页面滚回顶部那一帧的 move 接管，位移从那里重新起算
+   */
+  onSearchTouchMove(e: SearchTouchEvent) {
+    const self = this;
+    // 已露出（含常驻）/ 多选态：没有"再跟手拉出来"这回事
     if (self.data.searchShown || self.data.selecting) {
       self.searchTouchY = null;
       return;
     }
-    const y = e.touches && e.touches[0] ? e.touches[0].clientY : undefined;
-    self.searchTouchY = typeof y === 'number' && Number.isFinite(y) ? y : null;
+    const y = touchClientY(e);
+    if (y === null) return;
+
+    // 甩动速度：用相邻两次采样算，touchend 时读最近一次的值
+    const t = touchTime(e);
+    if (self.searchPullLastT > 0 && t > self.searchPullLastT) {
+      self.searchPullVelocity = (y - self.searchPullLastY) / (t - self.searchPullLastT);
+    }
+    self.searchPullLastY = y;
+    self.searchPullLastT = t;
+
+    if (self.searchTouchY === null) {
+      if (self.searchLastTop > SEARCH_PULL_TOP_TOLERANCE_PX) return;
+      if (self.searchPullVelocity < 0) return; // 正在上滑，不是"下拉露出"
+      self.searchTouchY = y;
+      // 起步这一帧就把过渡关掉（位移保持当前值）：否则第一段位移会被 0.34s 曲线吃掉
+      self.setData({ searchPullStyle: pullStyleOf(self.searchPullOffset, true) });
+      return;
+    }
+
+    const offset = pullOffsetFromDrag({ dy: y - self.searchTouchY, slotHeight: slotHeightPx() });
+    if (offset === self.searchPullOffset) return; // 手指停住时每帧都会进来，别空转 setData
+    self.searchPullOffset = offset;
+    self.setData({ searchPullStyle: pullStyleOf(offset, true) });
   },
 
   /**
-   * 贴顶下拉：位移够了就露出
+   * 触摸结束 / 取消：按速度与拉出量吸附
    *
-   * `top` 用的是**现读**的 searchLastTop（不是 touchstart 时的快照）：用户从列表中部一路拉回
-   * 顶部时，手指还没松开就已经贴顶了，只有现读才接得住这一段。
-   * 判定为 show 后立刻清掉起点 —— 一次手势只露一次，露出后继续拖不再重复触发。
+   * 速度优先 —— 甩动比"拉到哪"更能表达意图；都没甩再看拉出量过没过门槛。
+   *
+   * 回弹这一支**刻意不走 hideSearch**：它会被"正在使用 / 不可滚动"拦下，那样位移就停在
+   * 半路（手指已经松开、内容却卡在中间）。回弹只表达"这段手势没拉够"，与那两种状态无关 ——
+   * 需要常驻的场景在跟手入口就被拦下了（`searchShown` 为真时不接管手势）。
+   * 唯一的例外是"不能滚动"：那种列表里搜索栏本就该常驻，回弹成露出才自洽
+   * （也是"多选态把常驻栏藏起来后"唯一能把它找回来的路径）。
    */
-  onSearchTouchMove(e: SearchTouchEvent) {
-    const self = this;
-    if (self.searchTouchY === null) return;
-    const y = e.touches && e.touches[0] ? e.touches[0].clientY : undefined;
-    if (typeof y !== 'number' || !Number.isFinite(y)) return;
-    const intent = topPullIntent({
-      dy: y - self.searchTouchY,
-      top: self.searchLastTop,
-      shown: !!self.data.searchShown,
-      blocked: !!self.data.selecting,
-    });
-    if (intent !== 'show') return;
-    self.searchTouchY = null;
-    self.showSearch();
-  },
-
-  /** 手指离开 / 手势被系统打断：清掉起点，下一次触摸重新记 */
   onSearchTouchEnd() {
-    this.searchTouchY = null;
+    const self = this;
+    const started = self.searchTouchY !== null;
+    self.searchTouchY = null;
+    if (!started) return;
+    const slot = slotHeightPx();
+    const target = pullSnapTarget({
+      offset: self.searchPullOffset,
+      velocity: self.searchPullVelocity,
+      slotHeight: slot,
+    });
+    if (target === 'open') {
+      self.showSearch();
+      return;
+    }
+    if (self.searchUnscrollable) {
+      self.applyPullOffset(slot, true);
+      return;
+    }
+    self.applyPullOffset(0, false);
   },
 
   showSearch() {
     const self = this;
     // 多选态下搜索没有意义（勾选与筛选不同时在场）
     if (self.data.selecting) return;
-    if (!self.data.searchShown) self.setData({ searchShown: true });
+    const slot = slotHeightPx();
+    if (!self.data.searchShown || self.searchPullOffset !== slot) {
+      self.applyPullOffset(slot, true);
+    }
     // 露出即开始计时：用户没接着用就自己收回去
     self.armSearchTimer();
   },
@@ -203,8 +318,23 @@ export const searchRevealMixin: SearchRevealMixin & ThisType<SearchRevealSelf> =
   hideSearchIfShown() {
     const self = this;
     self.clearSearchTimer();
-    if (!self.data.searchShown) return;
-    self.setData({ searchShown: false });
+    // 跟手到一半被外部叫停时 searchShown 还是 false，但位移非 0 —— 也要归零
+    if (!self.data.searchShown && self.searchPullOffset === 0) return;
+    self.applyPullOffset(0, false);
+  },
+
+  /**
+   * 把位移与展开态一次性应用到位
+   *
+   * 露出的**唯一出口**：跟手吸附、滚动收回、空闲收起、切页复位全都汇到这里，
+   * 位移与目标态因此不可能各写各的（"状态翻了但画面没动"就是那么来的）。
+   * 顺带丢弃手势 —— 位移既然被外部接管，未完成的那段手势就不该再往画面里写值。
+   */
+  applyPullOffset(offset: number, shown: boolean) {
+    const self = this;
+    self.searchPullOffset = offset;
+    self.searchTouchY = null;
+    self.setData({ searchShown: shown, searchPullStyle: pullStyleOf(offset, false) });
   },
 
   onSearchFocus() {
@@ -226,7 +356,7 @@ export const searchRevealMixin: SearchRevealMixin & ThisType<SearchRevealSelf> =
     const self = this;
     if (keyword) {
       self.clearSearchTimer();
-      if (!self.data.searchShown) self.setData({ searchShown: true });
+      if (!self.data.searchShown) self.applyPullOffset(slotHeightPx(), true);
       return;
     }
     self.armSearchTimer();
@@ -265,7 +395,8 @@ export const searchRevealMixin: SearchRevealMixin & ThisType<SearchRevealSelf> =
         // 只在结论翻转时动一次：测量本身会随栏子尺寸变化，边界上反复翻会看着发抖
         if (fit === self.searchUnscrollable) return;
         self.searchUnscrollable = fit;
-        if (fit) self.setData({ searchShown: true });
+        // 常驻时走 applyPullOffset 而不是 showSearch：常驻不需要"空闲自动收起"那套计时
+        if (fit) self.applyPullOffset(slotHeightPx(), true);
         else self.hideSearch();
       })
       .exec();

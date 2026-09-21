@@ -2,6 +2,11 @@
 <!-- 多选入口不再占用导航栏：右滑单条记录即进入多选，多选态下左滑即退出（见下方左/右槽位） -->
 <navigation-bar title="记账" back="{{false}}" color="{{navBarColor}}" background="{{navBarBg}}"></navigation-bar>
 
+<!--
+  根节点挂的是 **capture-bind**（捕获阶段）而非 bind：van-swipe-cell 拖动中会在自己节点上
+  catchtouchmove 阻断冒泡，冒泡阶段的监听收不到"手指落在卡片上"的那一段 —— 而贴顶下拉
+  恰好全落在卡片上。捕获阶段先于子节点触发，不受 catch 影响（Vant 自己也是这么避干扰的）。
+-->
 <view
   class="page"
   style="{{pageStyle}}"
@@ -11,184 +16,190 @@
   capture-bind:touchcancel="onSearchTouchEnd"
 >
   <!--
-    搜索：限当前所选月份内，匹配备注 / 标签（防抖过滤列表，不动汇总数字）。
-    平时收在 .search-slot 里（高度 0，不占位也不可点）：下拉页面才露出，
-    往下翻或露出后久不操作自动收回 —— 编排在 behaviors/search-reveal.ts，样式在 app.wxss。
+    .pull 是「跟手下拉」的位移容器：JS 把当前位移拼成内联 style 写在它上面
+    （transform: translate3d(0, <位移>px, 0); transition: <none | 吸附曲线>）。
+    搜索栏绝对定位在它**上方**一个槽位高处，所以位移为 0 时完全在视口之外（不占位、不可点），
+    手指下拉多少它就从上方滑进来多少 —— 编排在 behaviors/search-reveal.ts，样式在 app.wxss。
+    注意：.pull 上的 transform 会给后代创建包含块，页面里不能有依赖它定位的 fixed 元素
+    （fab / 多选操作条 / 撤销条都在 .page 之外，安全）。
   -->
-  <view class="search-slot {{ searchShown ? 'search-slot--on' : '' }}">
-    <van-search
-      value="{{ keyword }}"
-      placeholder="搜索备注或标签"
-      shape="round"
-      bind:change="onSearch"
-      bind:focus="onSearchFocus"
-      bind:blur="onSearchBlur"
-      background="{{pageBg}}"
-    />
-  </view>
-  <view class="summary enter">
-    <!-- 月份切换：‹ › 逐月翻，中间点一下弹年月选择器直达（封顶当前月，与统计页同款交互） -->
-    <view class="summary__month">
-      <view class="month-nav" hover-class="month-nav--hover" hover-stay-time="60" bindtap="onPrevMonth">‹</view>
-      <picker mode="date" fields="month" value="{{ month }}" end="{{ maxMonth }}" bindchange="onPickMonth">
-        <view class="month-pill" hover-class="month-pill--hover" hover-stay-time="60">
-          <text class="month-pill__label">{{ monthText }}</text>
-          <view class="month-pill__caret"><van-icon name="arrow-down" size="20rpx" /></view>
-        </view>
-      </picker>
-      <view
-        class="month-nav {{ canNext ? '' : 'month-nav--off' }}"
-        hover-class="month-nav--hover"
-        hover-stay-time="60"
-        bindtap="onNextMonth"
-      >›</view>
-    </view>
-    <text class="summary__label">{{ summaryLabel }}</text>
-    <text class="summary__balance amount {{ balanceClass }}">{{ balanceText }}</text>
-    <view class="summary__row">
-      <view class="summary__col">
-        <text class="summary__k">收入</text>
-        <text class="summary__v amount--income">{{ incomeText }}</text>
-      </view>
-      <view class="summary__col">
-        <text class="summary__k">支出</text>
-        <text class="summary__v amount--expense">{{ expenseText }}</text>
-      </view>
-    </view>
-    <!-- 分类占比：与首页同一张卡、同一条口径（跟随所选月份），点详情进完整环形图（无支出时整块不占位） -->
-    <view class="summary__mix" wx:if="{{ mixItems.length }}">
-      <mix-bar
-        title="{{ mixTitle }}"
-        total-text="{{ mixTotalText }}"
-        items="{{ mixItems }}"
-        bind:open="goStats"
+  <view class="pull" style="{{ searchPullStyle }}">
+    <!-- 搜索：限当前所选月份内，匹配备注 / 标签（防抖过滤列表，不动汇总数字） -->
+    <view class="search-slot">
+      <van-search
+        value="{{ keyword }}"
+        placeholder="搜索备注或标签"
+        shape="round"
+        bind:change="onSearch"
+        bind:focus="onSearchFocus"
+        bind:blur="onSearchBlur"
+        background="{{pageBg}}"
       />
     </view>
-  </view>
-
-  <view class="group" wx:for="{{ groups }}" wx:key="date" wx:for-item="group" wx:for-index="gi">
-    <view class="group__head enter" style="animation-delay: {{ gi * 60 }}ms">
-      <text class="group__label">{{ group.label }}</text>
-      <text class="group__sum">{{ group.summaryText }}</text>
-    </view>
-    <!--
-      外层 .card-row：提供左右页面留白与行间距（卡片自身不带外边距，删除块才能与卡片严丝合缝）
-      外层 .row-collapse：整行收起的动画容器（删除时先钉住实测高度，下一帧再收到 0）
-      内层 .row-inner：多选时行首展开选择位，卡片自动让位；非多选时选择位宽度为 0，布局与之前完全一致
-    -->
-    <view
-      wx:for="{{ group.items }}"
-      wx:key="id"
-      wx:for-item="item"
-      wx:for-index="ii"
-      id="cell-{{ item.id }}"
-      class="card-row row-collapse {{ pickMap[item.id] ? 'row-picked' : '' }} {{ shrinkingMap[item.id] ? 'row-collapse--out' : '' }}"
-      style="{{ pinnedMap[item.id] ? 'max-height:' + pinnedMap[item.id] + 'px;' : '' }}"
-    >
-      <view class="row-inner">
-        <view class="pick {{ selecting ? 'pick--in' : '' }}" catchtap="onPick" data-id="{{ item.id }}">
-          <view class="pick__box {{ pickMap[item.id] ? 'is-on' : '' }}">
-            <van-icon wx:if="{{ pickMap[item.id] }}" name="success" size="24rpx" color="#ffffff" />
+    <view class="summary enter">
+      <!-- 月份切换：‹ › 逐月翻，中间点一下弹年月选择器直达（封顶当前月，与统计页同款交互） -->
+      <view class="summary__month">
+        <view class="month-nav" hover-class="month-nav--hover" hover-stay-time="60" bindtap="onPrevMonth">‹</view>
+        <picker mode="date" fields="month" value="{{ month }}" end="{{ maxMonth }}" bindchange="onPickMonth">
+          <view class="month-pill" hover-class="month-pill--hover" hover-stay-time="60">
+            <text class="month-pill__label">{{ monthText }}</text>
+            <view class="month-pill__caret"><van-icon name="arrow-down" size="20rpx" /></view>
           </view>
+        </picker>
+        <view
+          class="month-nav {{ canNext ? '' : 'month-nav--off' }}"
+          hover-class="month-nav--hover"
+          hover-stay-time="60"
+          bindtap="onNextMonth"
+        >›</view>
+      </view>
+      <text class="summary__label">{{ summaryLabel }}</text>
+      <text class="summary__balance amount {{ balanceClass }}">{{ balanceText }}</text>
+      <view class="summary__row">
+        <view class="summary__col">
+          <text class="summary__k">收入</text>
+          <text class="summary__v amount--income">{{ incomeText }}</text>
         </view>
-        <view class="row-main">
-          <!--
-            入场动画放在 van-swipe-cell 上：入场用 animation、收起用 transition，
-            若放在同一节点，animation 的 fill-mode 会永久压住 transform，收起位移就失效了。
+        <view class="summary__col">
+          <text class="summary__k">支出</text>
+          <text class="summary__v amount--expense">{{ expenseText }}</text>
+        </view>
+      </view>
+      <!-- 分类占比：与首页同一张卡、同一条口径（跟随所选月份），点详情进完整环形图（无支出时整块不占位） -->
+      <view class="summary__mix" wx:if="{{ mixItems.length }}">
+        <mix-bar
+          title="{{ mixTitle }}"
+          total-text="{{ mixTotalText }}"
+          items="{{ mixItems }}"
+          bind:open="goStats"
+        />
+      </view>
+    </view>
 
-            两个槽位对应两个手势，滑到阈值即触发（不必再点一下）：
-            - 左槽（右滑露出）：多选入口。多选态下 left-width 归零，Vant 会据此把已滑开的行自动收回
-            - 右槽（左滑露出）：平时是「删除」，多选态换成「退出」
-            name 用记录 id：Vant 的 open 事件 detail 自带 name，不必依赖 dataset 透传
+    <view class="group" wx:for="{{ groups }}" wx:key="date" wx:for-item="group" wx:for-index="gi">
+      <view class="group__head enter" style="animation-delay: {{ gi * 60 }}ms">
+        <text class="group__label">{{ group.label }}</text>
+        <text class="group__sum">{{ group.summaryText }}</text>
+      </view>
+      <!--
+        外层 .card-row：提供左右页面留白与行间距（卡片自身不带外边距，删除块才能与卡片严丝合缝）
+        外层 .row-collapse：整行收起的动画容器（删除时先钉住实测高度，下一帧再收到 0）
+        内层 .row-inner：多选时行首展开选择位，卡片自动让位；非多选时选择位宽度为 0，布局与之前完全一致
+      -->
+      <view
+        wx:for="{{ group.items }}"
+        wx:key="id"
+        wx:for-item="item"
+        wx:for-index="ii"
+        id="cell-{{ item.id }}"
+        class="card-row row-collapse {{ pickMap[item.id] ? 'row-picked' : '' }} {{ shrinkingMap[item.id] ? 'row-collapse--out' : '' }}"
+        style="{{ pinnedMap[item.id] ? 'max-height:' + pinnedMap[item.id] + 'px;' : '' }}"
+      >
+        <view class="row-inner">
+          <view class="pick {{ selecting ? 'pick--in' : '' }}" catchtap="onPick" data-id="{{ item.id }}">
+            <view class="pick__box {{ pickMap[item.id] ? 'is-on' : '' }}">
+              <van-icon wx:if="{{ pickMap[item.id] }}" name="success" size="24rpx" color="#ffffff" />
+            </view>
+          </view>
+          <view class="row-main">
+            <!--
+              入场动画放在 van-swipe-cell 上：入场用 animation、收起用 transition，
+              若放在同一节点，animation 的 fill-mode 会永久压住 transform，收起位移就失效了。
 
-            ⚠️ 两个 slot 都是"随时挂在文档里"的静态节点，显隐由 .swipe-act--hidden 切换。
-            绝不能改成 wx:if 让 slot 节点整体出现/消失：节点结构一变，glass-easel 重新展开
-            这两个插槽时，会把 header 里的 left-width / right-width 又写一遍（等价于宽度变化），
-            触发 Vant 的宽度 observer，把正在收起的那一行按新宽度重新滑开 —— 现象就是"滑不动"。
-            右槽用**两个并列的 view** 而不是 wx:if/wx:else：wx:else 也是"节点换一个"，
-            虽然比整块消失温和，但并列 + 类切换是唯一完全不改节点数的写法。
-          -->
-          <van-swipe-cell
-            id="swipe-{{ item.id }}"
-            name="{{ item.id }}"
-            data-name="{{ item.id }}"
-            class="swipe-cell enter"
-            style="animation-delay: {{ gi * 60 + ii * 40 }}ms"
-            left-width="{{ swipeReset || selecting || openSideMap[item.id] === 'right' ? 0 : swipeWidth }}"
-            right-width="{{ swipeReset || openSideMap[item.id] === 'left' ? 0 : swipeWidth }}"
-            bind:open="onSwipeOpen"
-            bind:click="onCellTap"
-            bind:touchend="onCellTouchEnd"
-          >
-            <ledger-card
-              record="{{ item }}"
-              currency="{{ currency }}"
-              selectable="{{ selecting }}"
-              bind:edit="onEdit"
-              bind:pick="onPick"
-            />
-            <!-- 多选态：左滑露出「退出」，滑到阈值即退出多选。
-                 退出后这一行还在收起动画里（exitMap），此间继续显示中性色块，避免闪成红色删除块 -->
-            <view
-              wx:if="{{ selecting || exitMap[item.id] }}"
-              slot="right"
-              class="swipe-act swipe-act--muted"
-              hover-class="swipe-act--active"
-              hover-stay-time="60"
-              bindtap="exitSelect"
+              两个槽位对应两个手势，滑到阈值即触发（不必再点一下）：
+              - 左槽（右滑露出）：多选入口。多选态下 left-width 归零，Vant 会据此把已滑开的行自动收回
+              - 右槽（左滑露出）：平时是「删除」，多选态换成「退出」
+              name 用记录 id：Vant 的 open 事件 detail 自带 name，不必依赖 dataset 透传
+
+              ⚠️ 两个 slot 都是"随时挂在文档里"的静态节点，显隐由 .swipe-act--hidden 切换。
+              绝不能改成 wx:if 让 slot 节点整体出现/消失：节点结构一变，glass-easel 重新展开
+              这两个插槽时，会把 header 里的 left-width / right-width 又写一遍（等价于宽度变化），
+              触发 Vant 的宽度 observer，把正在收起的那一行按新宽度重新滑开 —— 现象就是"滑不动"。
+              右槽用**两个并列的 view** 而不是 wx:if/wx:else：wx:else 也是"节点换一个"，
+              虽然比整块消失温和，但并列 + 类切换是唯一完全不改节点数的写法。
+            -->
+            <van-swipe-cell
+              id="swipe-{{ item.id }}"
+              name="{{ item.id }}"
+              data-name="{{ item.id }}"
+              class="swipe-cell enter"
+              style="animation-delay: {{ gi * 60 + ii * 40 }}ms"
+              left-width="{{ swipeReset || selecting || openSideMap[item.id] === 'right' ? 0 : swipeWidth }}"
+              right-width="{{ swipeReset || openSideMap[item.id] === 'left' ? 0 : swipeWidth }}"
+              bind:open="onSwipeOpen"
+              bind:click="onCellTap"
+              bind:touchend="onCellTouchEnd"
             >
-              <van-icon name="cross" size="36rpx" color="#ffffff" />
-              <text class="swipe-act__label">退出</text>
-            </view>
-            <!-- 平时：左滑露出「删除」 -->
-            <view
-              wx:else
-              slot="right"
-              class="swipe-act swipe-act--danger"
-              hover-class="swipe-act--active"
-              hover-stay-time="60"
-              data-id="{{ item.id }}"
-              bindtap="onDelete"
-            >
-              <van-icon name="delete-o" size="36rpx" color="#ffffff" />
-              <text class="swipe-act__label">删除</text>
-            </view>
-            <!-- 右滑露出「多选」：滑开即进入多选并选中这一条；滑出来再点它也走同一条路径 -->
-            <view
-              wx:if="{{ !selecting }}"
-              slot="left"
-              class="swipe-act swipe-act--primary"
-              hover-class="swipe-act--active"
-              hover-stay-time="60"
-              data-id="{{ item.id }}"
-              bindtap="onEnterSelect"
-            >
-              <van-icon name="records" size="36rpx" color="#ffffff" />
-              <text class="swipe-act__label">多选</text>
-            </view>
-          </van-swipe-cell>
+              <ledger-card
+                record="{{ item }}"
+                currency="{{ currency }}"
+                selectable="{{ selecting }}"
+                bind:edit="onEdit"
+                bind:pick="onPick"
+              />
+              <!-- 多选态：左滑露出「退出」，滑到阈值即退出多选。
+                   退出后这一行还在收起动画里（exitMap），此间继续显示中性色块，避免闪成红色删除块 -->
+              <view
+                wx:if="{{ selecting || exitMap[item.id] }}"
+                slot="right"
+                class="swipe-act swipe-act--muted"
+                hover-class="swipe-act--active"
+                hover-stay-time="60"
+                bindtap="exitSelect"
+              >
+                <van-icon name="cross" size="36rpx" color="#ffffff" />
+                <text class="swipe-act__label">退出</text>
+              </view>
+              <!-- 平时：左滑露出「删除」 -->
+              <view
+                wx:else
+                slot="right"
+                class="swipe-act swipe-act--danger"
+                hover-class="swipe-act--active"
+                hover-stay-time="60"
+                data-id="{{ item.id }}"
+                bindtap="onDelete"
+              >
+                <van-icon name="delete-o" size="36rpx" color="#ffffff" />
+                <text class="swipe-act__label">删除</text>
+              </view>
+              <!-- 右滑露出「多选」：滑开即进入多选并选中这一条；滑出来再点它也走同一条路径 -->
+              <view
+                wx:if="{{ !selecting }}"
+                slot="left"
+                class="swipe-act swipe-act--primary"
+                hover-class="swipe-act--active"
+                hover-stay-time="60"
+                data-id="{{ item.id }}"
+                bindtap="onEnterSelect"
+              >
+                <van-icon name="records" size="36rpx" color="#ffffff" />
+                <text class="swipe-act__label">多选</text>
+              </view>
+            </van-swipe-cell>
+          </view>
         </view>
       </view>
     </view>
-  </view>
 
-  <!-- 两种空态：该月没记账（带行动入口）/ 搜索无结果（纯提示） -->
-  <empty-state
-    wx:if="{{ groups.length === 0 && monthEmpty }}"
-    class="enter"
-    style="animation-delay: 120ms"
-    icon="balance-o"
-    text="{{ monthText }}还没有记录，记下第一笔吧"
-    action-text="记一笔"
-    bind:action="goEdit"
-  />
-  <empty-state
-    wx:elif="{{ groups.length === 0 }}"
-    class="enter"
-    style="animation-delay: 120ms"
-    icon="search"
-    text="没有匹配的记录"
-  />
+    <!-- 两种空态：该月没记账（带行动入口）/ 搜索无结果（纯提示） -->
+    <empty-state
+      wx:if="{{ groups.length === 0 && monthEmpty }}"
+      class="enter"
+      style="animation-delay: 120ms"
+      icon="balance-o"
+      text="{{ monthText }}还没有记录，记下第一笔吧"
+      action-text="记一笔"
+      bind:action="goEdit"
+    />
+    <empty-state
+      wx:elif="{{ groups.length === 0 }}"
+      class="enter"
+      style="animation-delay: 120ms"
+      icon="search"
+      text="没有匹配的记录"
+    />
+  </view>
 </view>
 
 <view wx:if="{{ !selecting }}" class="fab" hover-class="fab--hover" hover-stay-time="80" bindtap="goEdit">＋</view>
