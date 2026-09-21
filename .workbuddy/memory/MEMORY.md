@@ -112,8 +112,11 @@
   （否则防抖还会把关键词写回来）。搜索语义不变：限当月（记账）、跟随页签/标签（记事）
 - 经验教训：**给低频功能配复杂手势（下拉跟手/吸附）性价比极低**——动效要求越高、失败面越大；
   入口类功能优先用「点按入口 + 简单过渡」。另外 `navigation-bar` 有现成 right slot，别再重造
-- **导航栏标题居中（第四轮）**：`__center` 改绝对定位（left/right 0 + 上下 env(safe-area-inset-top)）
-  —— 左侧 leftWidth 内联固定宽 vs 右侧插槽图标不对称，flex 流内 `flex:1` 会被挤偏；
+- **导航栏标题居中（第四轮，第五轮修正垂直定位）**：`__center` 改绝对定位（left/right 0）——
+  左侧 leftWidth 内联固定宽 vs 右侧插槽图标不对称，flex 流内 `flex:1` 会被挤偏；
+  ⚠️ 垂直定位必须 **`bottom: 0 + height: var(--height)`**，不能 top/bottom 各
+  `env(safe-area-inset-top)`（绝对定位参照 inner 的内边距盒，top:0 含状态栏区、
+  内容带贴底；bottom 多减一次安全区高会把标题抬到状态栏一带，2026-09-21 真机翻车）；
   ⚠️ `__center` 必须加 `pointer-events: none`（全宽覆盖会挡住 right 插槽图标点击），
   `__right` 要 `flex:1 + justify-content: flex-end`（center 脱流后 right 不撑开会挤在中间）
 - 回退点（历史方案仅存 git）：跟手版 `d0eddf7`；「阈值弹出/高度撑开」版基线 `8732595`
